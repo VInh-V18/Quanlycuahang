@@ -27,3 +27,8 @@ logs/
 
 # --- Docker ---
 docker/postgres-data/
+
+# --- Local runtime artifacts ---
+server/uploads/
+dump.rdb
+*.rdb

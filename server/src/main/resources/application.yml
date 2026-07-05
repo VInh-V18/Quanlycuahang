@@ -21,6 +21,10 @@ spring:
   data:
     redis:
       timeout: 2000ms
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 2MB
 
 server:
   port: ${SERVER_PORT:8080}
@@ -45,3 +49,5 @@ app:
   jwt:
     access-token-ttl-minutes: 15
     refresh-token-ttl-days: 7
+  upload:
+    dir: ${UPLOAD_DIR:./uploads}
