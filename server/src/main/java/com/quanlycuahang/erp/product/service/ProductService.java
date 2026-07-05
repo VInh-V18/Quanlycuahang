@@ -4,6 +4,7 @@ import com.quanlycuahang.erp.auth.security.CurrentUserProvider;
 import com.quanlycuahang.erp.common.dto.ApiResponse;
 import com.quanlycuahang.erp.common.exception.BusinessRuleException;
 import com.quanlycuahang.erp.common.exception.ResourceNotFoundException;
+import com.quanlycuahang.erp.common.sequence.NumberSequenceService;
 import com.quanlycuahang.erp.product.dto.PriceHistoryResponse;
 import com.quanlycuahang.erp.product.dto.ProductRequest;
 import com.quanlycuahang.erp.product.dto.ProductResponse;
@@ -31,6 +32,7 @@ public class ProductService {
   private final ProductMapper productMapper;
   private final SettingsService settingsService;
   private final CurrentUserProvider currentUserProvider;
+  private final NumberSequenceService numberSequenceService;
 
   public ProductService(
       ProductRepository productRepository,
@@ -38,13 +40,15 @@ public class ProductService {
       PriceHistoryRepository priceHistoryRepository,
       ProductMapper productMapper,
       SettingsService settingsService,
-      CurrentUserProvider currentUserProvider) {
+      CurrentUserProvider currentUserProvider,
+      NumberSequenceService numberSequenceService) {
     this.productRepository = productRepository;
     this.categoryRepository = categoryRepository;
     this.priceHistoryRepository = priceHistoryRepository;
     this.productMapper = productMapper;
     this.settingsService = settingsService;
     this.currentUserProvider = currentUserProvider;
+    this.numberSequenceService = numberSequenceService;
   }
 
   @Transactional(readOnly = true)
@@ -137,12 +141,7 @@ public class ProductService {
 
   private String generateSku() {
     String prefix = settingsService.getValue(null, SettingsService.KEY_SKU_PREFIX, "SP-");
-    long sequence = productRepository.count() + 1;
-    String candidate = prefix + String.format("%06d", sequence);
-    while (productRepository.existsBySku(candidate)) {
-      sequence++;
-      candidate = prefix + String.format("%06d", sequence);
-    }
-    return candidate;
+    long sequence = numberSequenceService.nextValue(NumberSequenceService.SKU_SEQ);
+    return prefix + String.format("%06d", sequence);
   }
 }

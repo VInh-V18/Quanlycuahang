@@ -10,4 +10,6 @@ public interface DebtRepository extends JpaRepository<Debt, Long> {
   Page<Debt> findByCustomerId(Long customerId, Pageable pageable);
 
   Page<Debt> findBySupplierId(Long supplierId, Pageable pageable);
+
+  java.util.List<Debt> findByReferenceTypeAndReferenceId(String referenceType, Long referenceId);
 }

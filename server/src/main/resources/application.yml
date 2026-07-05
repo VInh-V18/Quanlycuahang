@@ -51,3 +51,8 @@ app:
     refresh-token-ttl-days: 7
   upload:
     dir: ${UPLOAD_DIR:./uploads}
+  vietqr:
+    bank-bin: ${VIETQR_BANK_BIN:970436}
+    account-number: ${VIETQR_ACCOUNT_NUMBER:0000000000}
+    merchant-name: ${VIETQR_MERCHANT_NAME:CUA HANG}
+    merchant-city: ${VIETQR_MERCHANT_CITY:HA NOI}
