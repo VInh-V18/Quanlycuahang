@@ -1,4 +1,4 @@
-## PROJECT_STATE — sau Phase 1 — 2026-07-05
+## PROJECT_STATE — sau Phase 3 — 2026-07-05
 
 ### Đã chốt
 - Không dùng Lombok (getter/setter/constructor viết tay, tường minh, không phụ thuộc annotation processor)
@@ -7,9 +7,14 @@
 - Cấu trúc repo: `client/` + `server/` đặt thẳng ở root repo (không có thư mục wrapper `kiotclone/`)
 - Format code Java: Spotless (google-java-format), chạy ở phase `verify`
 - Spring Boot 3.3.5, Java 21, PostgreSQL 16, Redis 7, Flyway 10 (qua BOM Spring Boot)
-- 6 vai trò RBAC: `owner`, `manager`, `cashier`, `sales_staff`, `warehouse_staff`, `accountant` — ma trận resource:action đầy đủ tại `docs/phase1/permission-matrix.md`
-- 19 use case (10 MUST + 9 SHOULD) đặc tả đầy đủ luồng chính/phụ/ngoại lệ/quy tắc, đối chiếu khớp mọi quy tắc B4 (giá vốn, 7 bước tính tiền POS, state machine, chống oversell, edge case 1–7)
-- Mermaid không có cú pháp `usecaseDiagram`/`deploymentDiagram` chuẩn UML → dùng `flowchart` thay thế (ghi chú "cần kiểm chứng" nếu nâng cấp Mermaid sau này)
+- 6 vai trò RBAC: `owner`, `manager`, `cashier`, `sales_staff`, `warehouse_staff`, `accountant` — ma trận resource:action đầy đủ tại `docs/phase1/permission-matrix.md` (51 quyền)
+- 19 use case (10 MUST + 9 SHOULD) đặc tả đầy đủ luồng chính/phụ/ngoại lệ/quy tắc, đối chiếu khớp mọi quy tắc B4
+- Mermaid không có cú pháp `usecaseDiagram`/`deploymentDiagram` chuẩn UML → dùng `flowchart` thay thế
+- Kiến trúc Controller → Service → Repository → Entity, constructor injection bắt buộc, DTO+MapStruct, Exception hierarchy (`AppException` + 5 lớp con), `GlobalExceptionHandler`, `ApiResponse<T>` D2, `CorrelationIdFilter` + logback JSON
+- **Mâu thuẫn phát hiện & đã xử lý (Phase 3)**: B4 yêu cầu đồng thời `allow_negative_stock` (cho bán âm) và `CHECK (stock >= 0)` tĩnh ở DB — 2 điều này loại trừ nhau. Đã thay `CHECK` tĩnh bằng `TRIGGER` (`fn_check_inventory_stock`) đọc cấu hình `settings.allow_negative_stock` theo chi nhánh (hoặc global) trước khi chặn — đã test thực tế cả 2 kịch bản (chặn khi tắt, cho phép khi bật). Chi tiết: `docs/phase3/erd.md`.
+- Schema đầy đủ 37 bảng (7 nhóm B4, gồm cả `user_branches` bổ sung cho kiểm soát IDOR đa chi nhánh — Phase 1.1 quy tắc 4), 34 JPA Entity tương ứng (3 bảng join thuần túy `role_permissions`/`user_roles`/`user_branches` không có Entity riêng, ánh xạ qua `@ManyToMany` + `@JoinTable`)
+- unaccent() mặc định STABLE, không dùng được trực tiếp trong index expression → tạo hàm wrapper `immutable_unaccent()` (IMMUTABLE) — phát hiện qua test thật, không phải suy đoán
+- **Đã verify thực tế** (không chỉ giả định): cài PostgreSQL 16 + Redis 7 local (sandbox không có Docker daemon), chạy `mvn spring-boot:run` với Flyway tự động migrate V1+V2 và **Hibernate `ddl-auto: validate` PASS** — xác nhận toàn bộ 34 Entity khớp chính xác schema. Actuator health trả `UP`.
 
 ### Cấu trúc project hiện tại
 ```
@@ -20,53 +25,55 @@ Quanlycuahang/
 │   └── src/
 │       ├── main/
 │       │   ├── java/com/quanlycuahang/erp/
-│       │   │   └── ErpApplication.java
+│       │   │   ├── ErpApplication.java
+│       │   │   ├── config/JpaAuditingConfig.java
+│       │   │   ├── common/{entity,dto,exception,web}/       # 12 file (Phase 2)
+│       │   │   ├── auth/entity/          # User, Role, Permission
+│       │   │   ├── system/entity/        # Branch, Settings, AuditLog
+│       │   │   ├── product/entity/       # Category, Product, ProductUnit, PriceHistory
+│       │   │   ├── product/repository/   # ProductRepository
+│       │   │   ├── inventory/entity/     # Inventory, InventoryTransaction, PurchaseOrder(Item), StockTake(Item)
+│       │   │   ├── partner/entity/       # CustomerGroup, Customer, Supplier, Debt, DebtPayment
+│       │   │   ├── sales/entity/         # ParkedOrder, Order, OrderItem, OrderPayment, Return, ReturnItem
+│       │   │   ├── promotion/entity/     # Promotion, Voucher, VoucherUsage
+│       │   │   └── operation/entity/     # Shift, CashTransaction, InvoiceTemplate, Invoice
 │       │   └── resources/
-│       │       ├── application.yml
-│       │       ├── application-local.yml
-│       │       ├── application-docker.yml
-│       │       ├── application-prod.yml
-│       │       └── db/migration/    # rỗng — migration đầu tiên ở Phase 3
-│       └── test/java/com/quanlycuahang/erp/   # rỗng
+│       │       ├── application*.yml, logback-spring.xml
+│       │       └── db/migration/
+│       │           ├── V1__init_schema.sql   (37 bang, trigger, index, extension)
+│       │           └── V2__seed_data.sql     (1 CN, 6 role, 51 quyen, 3 user, 5 danh muc, 30 SP, 5 KH, 3 NCC, 20 don)
+│       └── test/java/com/quanlycuahang/erp/product/ProductRepositoryIT.java
 ├── docker/                          # rỗng — cấu hình ở Phase 12
 ├── docs/
-│   ├── conventions.md
-│   ├── PROJECT_STATE.md
-│   └── phase1/
-│       ├── permission-matrix.md
-│       ├── business-specs-must.md
-│       ├── business-specs-should.md
-│       ├── use-case-diagram.md
-│       ├── sequence-diagrams.md
-│       ├── activity-diagrams.md
-│       ├── class-diagram.md
-│       └── component-deployment-diagram.md
+│   ├── conventions.md, PROJECT_STATE.md
+│   ├── phase1/  (8 file — permission matrix, business specs, diagrams)
+│   ├── phase2/architecture.md
+│   └── phase3/erd.md
 ├── scripts/                         # rỗng
-├── .env.example
-├── .gitignore
-└── README.md
+├── .env.example, .gitignore, README.md
 ```
 
 ### Database
-- Bảng đã có: chưa có — nhưng đã xác định đủ 7 nhóm / ~30 bảng (class diagram domain, `docs/phase1/class-diagram.md`), thiết kế schema chi tiết + Flyway migration ở Phase 3
-- Migration Flyway mới nhất: chưa có
+- Bảng đã có: đủ 37 bảng (xem `docs/phase3/erd.md` mục 4)
+- Migration Flyway mới nhất: `V2__seed_data.sql`
+- Extension: `unaccent`, `pg_trgm`; function: `immutable_unaccent()`, `fn_check_inventory_stock()` + trigger
 
 ### API đã sinh
-- Chưa có (chỉ có Actuator mặc định của Spring Boot: `GET /actuator/health`, `GET /actuator/info`)
+- Chưa có endpoint nghiệp vụ (Controller) — chỉ Actuator mặc định (`/actuator/health`, `/actuator/info`)
 
 ### FE đã sinh
 - Chưa có (thư mục `client/` để trống, khởi tạo ở Phase 5)
 
 ### Nợ kỹ thuật / dang dở
-- Chưa có Dockerfile/docker-compose.yml — xử lý ở Phase 12
-- Chưa có CI (GitHub Actions) — xử lý ở Phase 12
-- Chưa có test nào (unit/integration) — chưa có nghiệp vụ code để test, Phase 11 sẽ viết đầy đủ
-- Class diagram domain chưa gồm `stock_transfers` (đa chi nhánh + chuyển kho là COULD, chưa thiết kế chi tiết) — bổ sung nếu triển khai COULD
+- Chưa có Dockerfile/docker-compose.yml — Phase 12
+- Chưa có CI (GitHub Actions) — Phase 12
+- `ProductRepositoryIT` dùng Testcontainers — viết đúng chuẩn nhưng **chưa chạy được trong sandbox này** (không có Docker daemon khả dụng); đã verify tương đương bằng PostgreSQL/Redis cài trực tiếp + `spring-boot:run` thật (xem trên) — cần chạy lại `mvn verify` trên máy/CI có Docker trước khi coi là đã pass CI
+- `stock_transfers` (chuyển kho đa chi nhánh, COULD) chưa thiết kế
 
-### Tự đánh giá Phase 1
-- **Mạnh**: mọi quy tắc B4 (giá vốn bình quân, 7 bước tính tiền, state machine, chống oversell 2 lớp, 7 edge case) đều xuất hiện nhất quán trong đặc tả UC-04/05/12/13; ma trận phân quyền là nguồn seed duy nhất, không tạo nhánh code đặc biệt cho `owner`.
-- **Thiếu**: chưa có đặc tả chi tiết cho `stock_transfers` (chuyển kho đa chi nhánh — COULD, không bắt buộc MVP).
-- **Rủi ro**: Mermaid dùng `flowchart` thay cho `usecaseDiagram`/`deploymentDiagram` chuẩn UML do bản ổn định hiện tại không hỗ trợ cú pháp UML gốc — đã ghi rõ "cần kiểm chứng" trong 2 file liên quan, không ảnh hưởng nội dung nghiệp vụ.
+### Tự đánh giá Phase 3
+- **Mạnh**: verify bằng ứng dụng Spring Boot chạy thật (không chỉ đọc code), phát hiện và sửa 2 lỗi thực tế (unaccent IMMUTABLE, mâu thuẫn allow_negative_stock) trước khi bàn giao thay vì để lại nợ kỹ thuật ẩn.
+- **Thiếu**: chưa có Controller/Service (đúng phạm vi Phase 3, sẽ có ở Phase 6 trở đi); seed data đơn giản hóa (20 đơn không có chiết khấu/voucher — đủ cho dev/demo, kịch bản đầy đủ để ở Phase 11 test).
+- **Rủi ro**: `ProductRepositoryIT` chưa được CI thực thi trong phiên làm việc này do thiếu Docker — cần chạy xác nhận trên môi trường có Docker trước khi merge.
 
 ### Kế tiếp
-- Phase 2: Kiến trúc Backend (Controller → Service → Repository → Entity), DI constructor injection, chuẩn DTO + MapStruct, Exception hierarchy, Logging, cấu trúc package chi tiết
+- Phase 4: Thiết kế giao diện (design tokens, layout, wireframe, POS, trạng thái UI chuẩn) — độc lập với backend
