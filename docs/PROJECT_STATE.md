@@ -1,4 +1,12 @@
-## PROJECT_STATE — sau Phase 6 — 2026-07-05
+## PROJECT_STATE — sau Phase 7 — 2026-07-05
+
+### Đã chốt (Phase 7 — Module Sản phẩm & Kho)
+- **Bug thật phát hiện qua test chạy thật**: `BaseEntity.createdAt/updatedAt` kiểu `OffsetDateTime` làm Spring Data Auditing crash (`DefaultAuditableBeanWrapperFactory` bản Spring Boot 3.3.5 chỉ hỗ trợ `Instant` trong nhóm java.time, không hỗ trợ `OffsetDateTime`) — đã sửa sang `Instant`, verify tạo sản phẩm thành công sau khi sửa
+- Category (cây 2 cấp) + Product (SKU tự sinh, lịch sử giá ghi trong Service thay vì `@EntityListeners` — lý do: JPA EntityListener không phải Spring bean, khó inject Repository an toàn) CRUD đầy đủ
+- Tìm không dấu + gần đúng (`immutable_unaccent` + `ILIKE` + `pg_trgm %`) — **verify bằng dữ liệu có dấu thật**: "ca phe sua da" tìm ra "Cà phê sữa đá đặc biệt"
+- `AverageCostService` Java thuần (không Spring) tính giá vốn bình quân gia quyền — **verify bằng phép tính tay chính xác**: tồn 98@38.500 + nhập 50@40.000 → giá vốn mới 39.007 (khớp `5.773.000/148=39006,756→HALF_UP`)
+- `PurchaseOrderService`: khóa PESSIMISTIC_WRITE chống race condition, tự tạo công nợ NCC nếu mua thiếu — verify Debt payable tạo đúng số tiền
+- `StockTakeService`: kiểm kê snapshot → nhập thực tế → duyệt bắt buộc lý do khi có chênh lệch — verify chặn duyệt thiếu lý do (422) và duyệt thành công điều chỉnh đúng tồn kho
 
 ### Đã chốt (Phase 6 — Backend Foundation)
 - SecurityConfig STATELESS, CORS whitelist, CSRF tắt (giải thích lý do); JwtAuthenticationEntryPoint/AccessDeniedHandler trả JSON đúng format D2 ngay ở filter chain
