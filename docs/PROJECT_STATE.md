@@ -1,6 +1,13 @@
-## PROJECT_STATE — sau Phase 3 — 2026-07-05
+## PROJECT_STATE — sau Phase 4 — 2026-07-05
 
 ### Đã chốt
+- Design tokens: palette hex + HSL (light/dark), font Inter, radius 8px, thang shadow sm/md/lg — `docs/phase4/design-tokens.md` kèm `tailwind.config.ts` + CSS variables sẵn dùng cho Phase 5.1
+- Layout chính: Sidebar (240px, thu gọn 64px) + Topbar (56px); POS dùng layout riêng toàn màn hình, không sidebar/topbar
+- POS: 2 cột (60% sản phẩm / 40% giỏ hàng + thanh toán), 10 phím tắt F1–F9+Esc, scanner-friendly (auto-focus/refocus ô tìm kiếm), tối thiểu 1024×768, touch target ≥44px
+- 15 wireframe màn hình (Dashboard, Sản phẩm, Nhập kho, Tồn kho, Kiểm kê, Đơn hàng, Trả hàng, Hóa đơn, Khách hàng, NCC, Công nợ, Nhân viên & phân quyền, Ca & két, Báo cáo, Cài đặt) + POS riêng — mỗi màn đủ mục đích/thành phần/hành động/trạng thái/phím tắt
+- Trạng thái UI chuẩn dùng chung: loading (skeleton, không spinner toàn màn hình), empty (phân biệt chưa có dữ liệu vs lọc không ra kết quả), error (toast + map code→message, không trắng trang), dark mode (qua CSS variable, không hardcode hex), responsive 3 breakpoint
+
+### Đã chốt (Phase 1–3, giữ nguyên)
 - Không dùng Lombok (getter/setter/constructor viết tay, tường minh, không phụ thuộc annotation processor)
 - Build tool: Maven
 - Package gốc Java: `com.quanlycuahang.erp`
@@ -48,7 +55,8 @@ Quanlycuahang/
 │   ├── conventions.md, PROJECT_STATE.md
 │   ├── phase1/  (8 file — permission matrix, business specs, diagrams)
 │   ├── phase2/architecture.md
-│   └── phase3/erd.md
+│   ├── phase3/erd.md
+│   └── phase4/  (design-tokens, layout, wireframes, pos-design, ui-states)
 ├── scripts/                         # rỗng
 ├── .env.example, .gitignore, README.md
 ```
@@ -62,18 +70,24 @@ Quanlycuahang/
 - Chưa có endpoint nghiệp vụ (Controller) — chỉ Actuator mặc định (`/actuator/health`, `/actuator/info`)
 
 ### FE đã sinh
-- Chưa có (thư mục `client/` để trống, khởi tạo ở Phase 5)
+- Chưa có code (thư mục `client/` để trống) — nhưng đã có đầy đủ thiết kế: design tokens + `tailwind.config.ts` sẵn dùng, layout, 15+1 wireframe, chuẩn UI states — khởi tạo code thật ở Phase 5
 
 ### Nợ kỹ thuật / dang dở
 - Chưa có Dockerfile/docker-compose.yml — Phase 12
 - Chưa có CI (GitHub Actions) — Phase 12
 - `ProductRepositoryIT` dùng Testcontainers — viết đúng chuẩn nhưng **chưa chạy được trong sandbox này** (không có Docker daemon khả dụng); đã verify tương đương bằng PostgreSQL/Redis cài trực tiếp + `spring-boot:run` thật (xem trên) — cần chạy lại `mvn verify` trên máy/CI có Docker trước khi coi là đã pass CI
 - `stock_transfers` (chuyển kho đa chi nhánh, COULD) chưa thiết kế
+- Wireframe hiện là mô tả text + Mermaid box diagram (chưa phải hình ảnh/Figma) — đủ chi tiết để code Phase 5 nhưng không có mockup trực quan; có thể bổ sung sau nếu cần
 
-### Tự đánh giá Phase 3
+### Tự đánh giá Phase 4
+- **Mạnh**: token màu đạt tương phản WCAG AA cả 2 theme; POS thiết kế đủ chi tiết để code thẳng không cần hỏi lại (đủ 10 phím tắt, hành vi auto-focus rõ ràng); mọi màn đều có đủ 5 mục theo Gate (mục đích/thành phần/hành động/trạng thái/phím tắt).
+- **Thiếu**: chưa có mockup hình ảnh trực quan (Figma-style) — chỉ có mô tả text/Mermaid; nếu cần trình bày cho stakeholder không kỹ thuật, nên bổ sung mockup HTML/hình ảnh riêng.
+- **Rủi ro**: chưa test tương phản màu thực tế bằng công cụ (mới tính toán HSL thủ công) — cần kiểm chứng lại bằng contrast checker khi có code thật ở Phase 5.
+
+### Tự đánh giá Phase 3 (giữ nguyên)
 - **Mạnh**: verify bằng ứng dụng Spring Boot chạy thật (không chỉ đọc code), phát hiện và sửa 2 lỗi thực tế (unaccent IMMUTABLE, mâu thuẫn allow_negative_stock) trước khi bàn giao thay vì để lại nợ kỹ thuật ẩn.
 - **Thiếu**: chưa có Controller/Service (đúng phạm vi Phase 3, sẽ có ở Phase 6 trở đi); seed data đơn giản hóa (20 đơn không có chiết khấu/voucher — đủ cho dev/demo, kịch bản đầy đủ để ở Phase 11 test).
 - **Rủi ro**: `ProductRepositoryIT` chưa được CI thực thi trong phiên làm việc này do thiếu Docker — cần chạy xác nhận trên môi trường có Docker trước khi merge.
 
 ### Kế tiếp
-- Phase 4: Thiết kế giao diện (design tokens, layout, wireframe, POS, trạng thái UI chuẩn) — độc lập với backend
+- Phase 5: Frontend Foundation (5.1 Vite+TS+Tailwind+shadcn, 5.2 axios+TanStack Query+Redux, 5.3 component nền DataTable/FormField/ConfirmDialog/Money/DateRangePicker/Toast/PermissionGate)
