@@ -1,20 +1,21 @@
 package com.quanlycuahang.erp.partner.dto;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 
-public class SupplierResponse {
+public class CustomerListItemResponse {
 
   private Long id;
   private String name;
   private String phone;
   private String address;
-
-  /** Tong cong no phai tra con du — xem DebtRepository.sumOutstandingBySupplierId. */
-  private BigDecimal outstandingDebt;
-
+  private Long customerGroupId;
+  private String groupName;
+  private BigDecimal debtLimit;
   private BigDecimal totalPurchased;
   private long orderCount;
-  private java.time.Instant lastPurchaseAt;
+  private Instant lastPurchaseAt;
+  private BigDecimal currentDebt;
 
   public Long getId() {
     return id;
@@ -48,12 +49,28 @@ public class SupplierResponse {
     this.address = address;
   }
 
-  public BigDecimal getOutstandingDebt() {
-    return outstandingDebt;
+  public Long getCustomerGroupId() {
+    return customerGroupId;
   }
 
-  public void setOutstandingDebt(BigDecimal outstandingDebt) {
-    this.outstandingDebt = outstandingDebt;
+  public void setCustomerGroupId(Long customerGroupId) {
+    this.customerGroupId = customerGroupId;
+  }
+
+  public String getGroupName() {
+    return groupName;
+  }
+
+  public void setGroupName(String groupName) {
+    this.groupName = groupName;
+  }
+
+  public BigDecimal getDebtLimit() {
+    return debtLimit;
+  }
+
+  public void setDebtLimit(BigDecimal debtLimit) {
+    this.debtLimit = debtLimit;
   }
 
   public BigDecimal getTotalPurchased() {
@@ -72,11 +89,19 @@ public class SupplierResponse {
     this.orderCount = orderCount;
   }
 
-  public java.time.Instant getLastPurchaseAt() {
+  public Instant getLastPurchaseAt() {
     return lastPurchaseAt;
   }
 
-  public void setLastPurchaseAt(java.time.Instant lastPurchaseAt) {
+  public void setLastPurchaseAt(Instant lastPurchaseAt) {
     this.lastPurchaseAt = lastPurchaseAt;
+  }
+
+  public BigDecimal getCurrentDebt() {
+    return currentDebt;
+  }
+
+  public void setCurrentDebt(BigDecimal currentDebt) {
+    this.currentDebt = currentDebt;
   }
 }

@@ -1,6 +1,7 @@
 package com.quanlycuahang.erp.partner.controller;
 
 import com.quanlycuahang.erp.common.dto.ApiResponse;
+import com.quanlycuahang.erp.partner.dto.CustomerListItemResponse;
 import com.quanlycuahang.erp.partner.dto.CustomerRequest;
 import com.quanlycuahang.erp.partner.dto.CustomerResponse;
 import com.quanlycuahang.erp.partner.service.CustomerService;
@@ -33,6 +34,17 @@ public class CustomerController {
   public ResponseEntity<ApiResponse<List<CustomerResponse>>> search(
       @RequestParam(required = false, defaultValue = "") String search, Pageable pageable) {
     return ResponseEntity.ok(customerService.search(search, pageable));
+  }
+
+  @GetMapping("/list")
+  @PreAuthorize("hasAuthority('customer:view')")
+  public ResponseEntity<ApiResponse<List<CustomerListItemResponse>>> listWithStats(
+      @RequestParam(required = false, defaultValue = "") String search,
+      @RequestParam(required = false) Long customerGroupId,
+      @RequestParam(required = false) Boolean hasDebt,
+      Pageable pageable) {
+    return ResponseEntity.ok(
+        customerService.listWithStats(search, customerGroupId, hasDebt, pageable));
   }
 
   @GetMapping("/{id}")

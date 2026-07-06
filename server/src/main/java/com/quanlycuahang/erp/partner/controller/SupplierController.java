@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -31,6 +32,13 @@ public class SupplierController {
   @PreAuthorize("hasAuthority('supplier:view')")
   public ResponseEntity<ApiResponse<List<SupplierResponse>>> list(Pageable pageable) {
     return ResponseEntity.ok(supplierService.list(pageable));
+  }
+
+  @GetMapping("/list")
+  @PreAuthorize("hasAuthority('supplier:view')")
+  public ResponseEntity<ApiResponse<List<SupplierResponse>>> listWithStats(
+      @RequestParam(required = false, defaultValue = "") String search, Pageable pageable) {
+    return ResponseEntity.ok(supplierService.listWithStats(search, pageable));
   }
 
   @PostMapping

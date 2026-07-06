@@ -8,6 +8,10 @@ import com.quanlycuahang.erp.partner.entity.Supplier;
 import com.quanlycuahang.erp.partner.mapper.SupplierMapper;
 import com.quanlycuahang.erp.partner.repository.DebtRepository;
 import com.quanlycuahang.erp.partner.repository.SupplierRepository;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -38,6 +42,42 @@ public class SupplierService {
       supplier.setOutstandingDebt(debtRepository.sumOutstandingBySupplierId(supplier.getId()));
     }
     return response;
+  }
+
+  @Transactional(readOnly = true)
+  public ApiResponse<List<SupplierResponse>> listWithStats(String search, Pageable pageable) {
+    Page<Object[]> page =
+        supplierRepository.searchWithStats(search == null ? "" : search.trim(), pageable);
+    return ApiResponse.page(page.map(SupplierService::toListItem));
+  }
+
+  private static SupplierResponse toListItem(Object[] row) {
+    SupplierResponse response = new SupplierResponse();
+    response.setId(((Number) row[0]).longValue());
+    response.setName((String) row[1]);
+    response.setPhone((String) row[2]);
+    response.setAddress((String) row[3]);
+    response.setTotalPurchased((BigDecimal) row[4]);
+    response.setOrderCount(((Number) row[5]).longValue());
+    response.setLastPurchaseAt(toInstant(row[6]));
+    response.setOutstandingDebt((BigDecimal) row[7]);
+    return response;
+  }
+
+  private static Instant toInstant(Object value) {
+    if (value == null) {
+      return null;
+    }
+    if (value instanceof Instant instant) {
+      return instant;
+    }
+    if (value instanceof OffsetDateTime odt) {
+      return odt.toInstant();
+    }
+    if (value instanceof java.sql.Timestamp ts) {
+      return ts.toInstant();
+    }
+    throw new IllegalStateException("Khong the chuyen doi thoi gian: " + value.getClass());
   }
 
   @Transactional
