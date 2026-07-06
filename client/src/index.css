@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 160 13% 95%;
+  --foreground: 164 28% 10%;
+  --primary: 168 83% 26%;
+  --primary-foreground: 0 0% 100%;
+  --primary-hover: 166 79% 20%;
+  --secondary: 160 13% 92%;
+  --secondary-foreground: 164 28% 10%;
+  --muted: 160 13% 93%;
+  --muted-foreground: 164 12% 42%;
+  --accent: 168 40% 94%;
+  --accent-foreground: 164 28% 10%;
+  --success: 168 83% 26%;
+  --success-foreground: 0 0% 100%;
+  --warning: 32 95% 44%;
+  --warning-foreground: 0 0% 100%;
+  --destructive: 354 61% 48%;
+  --destructive-foreground: 0 0% 100%;
+  --info: 221 69% 46%;
+  --info-foreground: 0 0% 100%;
+  --border: 160 10% 87%;
+  --input: 160 10% 87%;
+  --ring: 168 83% 26%;
+  --radius: 0.625rem;
+
+  --sidebar: 168 59% 11%;
+  --sidebar-foreground: 0 0% 100%;
+  --sidebar-muted: 160 20% 65%;
+  --sidebar-active: 168 83% 26%;
+  --sidebar-border: 168 45% 18%;
+}
+
+.dark {
+  --background: 168 30% 7%;
+  --foreground: 160 15% 90%;
+  --primary: 168 70% 40%;
+  --primary-foreground: 168 30% 7%;
+  --primary-hover: 168 70% 46%;
+  --secondary: 168 20% 14%;
+  --secondary-foreground: 160 15% 90%;
+  --muted: 168 20% 12%;
+  --muted-foreground: 160 12% 62%;
+  --accent: 168 30% 18%;
+  --accent-foreground: 160 15% 90%;
+  --success: 168 70% 40%;
+  --success-foreground: 168 30% 7%;
+  --warning: 38 92% 55%;
+  --warning-foreground: 168 30% 7%;
+  --destructive: 354 70% 58%;
+  --destructive-foreground: 168 30% 7%;
+  --info: 221 80% 62%;
+  --info-foreground: 168 30% 7%;
+  --border: 168 20% 16%;
+  --input: 168 20% 16%;
+  --ring: 168 70% 40%;
+
+  --sidebar: 168 59% 8%;
+  --sidebar-foreground: 0 0% 100%;
+  --sidebar-muted: 160 15% 60%;
+  --sidebar-active: 168 70% 40%;
+  --sidebar-border: 168 45% 14%;
+}
+
+* {
+  @apply border-border;
+}
+
+body {
+  @apply bg-background text-foreground font-sans antialiased;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+#root {
+  min-height: 100svh;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}

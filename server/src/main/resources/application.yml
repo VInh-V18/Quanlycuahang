@@ -21,6 +21,21 @@ spring:
   data:
     redis:
       timeout: 2000ms
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 2MB
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:false}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS:false}
 
 server:
   port: ${SERVER_PORT:8080}
@@ -33,6 +48,12 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+  health:
+    mail:
+      # Email hoa don la best-effort, gui sau khi transaction ban hang da commit (Phase 9) —
+      # SMTP gian doan KHONG duoc phep keo /actuator/health cua toan he thong xuong DOWN
+      # (readiness probe se loai bo mot instance van dang ban hang binh thuong).
+      enabled: false
 
 springdoc:
   api-docs:
@@ -45,3 +66,15 @@ app:
   jwt:
     access-token-ttl-minutes: 15
     refresh-token-ttl-days: 7
+  auth:
+    refresh-cookie-secure: true
+  email:
+    enabled: ${INVOICE_EMAIL_ENABLED:true}
+    from: ${MAIL_FROM:no-reply@quanlycuahang.local}
+  upload:
+    dir: ${UPLOAD_DIR:./uploads}
+  vietqr:
+    bank-bin: ${VIETQR_BANK_BIN:970436}
+    account-number: ${VIETQR_ACCOUNT_NUMBER:0000000000}
+    merchant-name: ${VIETQR_MERCHANT_NAME:CUA HANG}
+    merchant-city: ${VIETQR_MERCHANT_CITY:HA NOI}

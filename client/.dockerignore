@@ -1,0 +1,10 @@
+node_modules
+dist
+dist-ssr
+e2e
+playwright-report
+test-results
+blob-report
+.git
+.vscode
+*.log
