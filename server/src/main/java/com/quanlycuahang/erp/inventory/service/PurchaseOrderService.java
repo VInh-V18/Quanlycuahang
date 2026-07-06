@@ -173,6 +173,7 @@ public class PurchaseOrderService {
       debt.setSupplier(supplier);
       debt.setDirection("payable");
       debt.setAmount(unpaid);
+      debt.setOriginalAmount(unpaid);
       debt.setReferenceType("purchase_order");
       debt.setReferenceId(purchaseOrder.getId());
       debtRepository.save(debt);

@@ -35,6 +35,10 @@ public class Debt extends BaseEntity {
   @Column(name = "amount", nullable = false)
   private BigDecimal amount;
 
+  /** So tien no phat sinh luc dau, khong doi — "amount" o tren giam dan khi thanh toan (FH-12). */
+  @Column(name = "original_amount", nullable = false)
+  private BigDecimal originalAmount;
+
   @Column(name = "reference_type")
   private String referenceType;
 
@@ -74,6 +78,14 @@ public class Debt extends BaseEntity {
 
   public void setAmount(BigDecimal amount) {
     this.amount = amount;
+  }
+
+  public BigDecimal getOriginalAmount() {
+    return originalAmount;
+  }
+
+  public void setOriginalAmount(BigDecimal originalAmount) {
+    this.originalAmount = originalAmount;
   }
 
   public String getReferenceType() {

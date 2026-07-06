@@ -325,6 +325,7 @@ public class OrderService {
       debt.setCustomer(customer);
       debt.setDirection("receivable");
       debt.setAmount(unpaid);
+      debt.setOriginalAmount(unpaid);
       debt.setReferenceType("order");
       debt.setReferenceId(order.getId());
       debtRepository.save(debt);
