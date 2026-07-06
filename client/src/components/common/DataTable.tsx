@@ -41,6 +41,7 @@ export interface DataTableProps<T> {
   onSearchChange?: (value: string) => void;
   searchPlaceholder?: string;
   emptyMessage?: string;
+  onRowClick?: (row: T) => void;
 }
 
 /** DataTable dùng chung mọi màn danh sách — đọc `meta.page/limit/total` đúng shape
@@ -61,6 +62,7 @@ export function DataTable<T>({
   onSearchChange,
   searchPlaceholder = "Tìm kiếm...",
   emptyMessage = "Không có dữ liệu",
+  onRowClick,
 }: DataTableProps<T>) {
   const totalPages = meta ? Math.max(1, Math.ceil(meta.total / Math.max(meta.limit, 1))) : 1;
   const currentPage = meta ? meta.page : 0;
@@ -142,7 +144,11 @@ export function DataTable<T>({
               </TableRow>
             ) : (
               data.map((row) => (
-                <TableRow key={rowKey(row)}>
+                <TableRow
+                  key={rowKey(row)}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  className={cn(onRowClick && "cursor-pointer hover:bg-accent")}
+                >
                   {columns.map((column) => (
                     <TableCell key={column.key} className={column.className}>
                       {column.render ? column.render(row) : String((row as Record<string, unknown>)[column.key] ?? "")}

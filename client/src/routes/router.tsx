@@ -31,6 +31,17 @@ const PurchaseOrderCreatePage = lazy(() =>
     default: m.PurchaseOrderCreatePage,
   })),
 );
+const StockTakesPage = lazy(() =>
+  import("@/pages/stock-takes/StockTakesPage").then((m) => ({ default: m.StockTakesPage })),
+);
+const StockTakeNewPage = lazy(() =>
+  import("@/pages/stock-takes/StockTakesPage").then((m) => ({ default: m.StockTakeNewPage })),
+);
+const StockTakeDetailPage = lazy(() =>
+  import("@/pages/stock-takes/StockTakeDetailPage").then((m) => ({
+    default: m.StockTakeDetailPage,
+  })),
+);
 const PosPage = lazy(() => import("@/pages/pos/PosPage").then((m) => ({ default: m.PosPage })));
 const InvoicePrintPage = lazy(() =>
   import("@/pages/invoices/InvoicePrintPage").then((m) => ({ default: m.InvoicePrintPage })),
@@ -135,6 +146,30 @@ const router = createBrowserRouter([
         element: withSuspense(
           <RequirePermission perm="purchase-order:create">
             <PurchaseOrderCreatePage />
+          </RequirePermission>,
+        ),
+      },
+      {
+        path: "/stock-takes",
+        element: withSuspense(
+          <RequirePermission perm="stock-take:view">
+            <StockTakesPage />
+          </RequirePermission>,
+        ),
+      },
+      {
+        path: "/stock-takes/new",
+        element: withSuspense(
+          <RequirePermission perm="stock-take:create">
+            <StockTakeNewPage />
+          </RequirePermission>,
+        ),
+      },
+      {
+        path: "/stock-takes/:id",
+        element: withSuspense(
+          <RequirePermission perm="stock-take:view">
+            <StockTakeDetailPage />
           </RequirePermission>,
         ),
       },
