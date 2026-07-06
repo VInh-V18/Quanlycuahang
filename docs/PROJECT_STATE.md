@@ -1,4 +1,52 @@
-## PROJECT_STATE — sau Phase 11 — 2026-07-06
+## PROJECT_STATE — sau Phase 12 — 2026-07-06
+
+### Đã chốt (Phase 12 — DevOps & tài liệu)
+- `server/Dockerfile` (multi-stage: `maven:3.9-eclipse-temurin-21` build → `eclipse-temurin:21-jre-alpine`
+  runtime, user non-root, healthcheck `/actuator/health`) và `client/Dockerfile` (multi-stage:
+  `node:20-alpine` build → `nginx:1.27-alpine` runtime, healthcheck `GET /`) + `.dockerignore` riêng
+  cho từng service (client cần thiết yếu — thiếu sẽ khiến `COPY . .` sau `npm ci` ghi đè
+  `node_modules` mới cài bằng bản trên host).
+- `docker/docker-compose.yml` (postgres, redis, server, web dùng chung 1 file cho cả 2 kịch bản
+  triển khai VPS/LAN, chỉ khác `.env`) + `docker/nginx.conf` (SPA fallback, proxy `/api` sang
+  `server`, gzip, cache tài nguyên tĩnh có hash) — `nginx.conf` mount qua volume thay vì `COPY`
+  trong Dockerfile vì Docker không cho `COPY` đọc ngoài build context (`../docker/`).
+  **Bẫy thật phát hiện lúc verify bằng `docker compose config`**: biến top-level (`${DB_NAME}`,
+  `${WEB_PORT}`...) không được thay thế dù `.env` đã có ở root repo — Compose mặc định chỉ tự tìm
+  `.env` cạnh chính file compose (`docker/.env`), không phải theo CWD hay root repo; phải luôn gọi
+  kèm `--env-file .env` khi compose file nằm ở thư mục con. Đã ghi rõ vào README.
+- **Bug thật phát hiện khi rà lại `pom.xml` trước khi viết CI**: thiếu `maven-failsafe-plugin` —
+  Surefire mặc định chỉ nhận diện `*Test.java`, nên mọi `*IT.java` (Testcontainers, gồm cả
+  `ProductRepositoryIT` từ Phase 3 và 2 IT mới ở Phase 11) **chưa từng thực sự chạy** dưới bất kỳ
+  lệnh `mvn` nào từ đầu dự án — file tồn tại, compile sạch, nhưng không nằm trong tập test nào được
+  thực thi, tạo cảm giác an toàn giả. Đã sửa bằng cách thêm `maven-failsafe-plugin` gắn vào goal
+  `integration-test`+`verify`; xác nhận `mvn test` vẫn nhanh/không chạm Docker (chỉ Surefire) còn
+  `mvn verify` (dùng trong CI) chạy cả 2. Bug này lẽ ra phải bắt được từ Phase 3 nếu có CI sớm hơn
+  — minh chứng cụ thể cho lý do cần có Phase 12 sớm trong vòng đời dự án thật.
+- **29 file Java lệch format phát hiện khi thử `mvn verify` lần đầu**: toàn bộ code viết tay xuyên
+  suốt FH-12 → FH-16, Phase 11 và bản vá refresh-token chưa từng chạy qua `spotless:check` (chỉ
+  chạy `mvn test`/`spring-boot:run` trong lúc phát triển, không phải `verify`). Đã sửa bằng
+  `mvn spotless:apply` (thuần whitespace/import-order, không đổi ngữ nghĩa) — xác nhận lại
+  `OrderPricingServiceTest` vẫn 23/23 xanh sau khi format lại.
+- `.github/workflows/ci.yml`: 3 job — `backend` (`mvn verify`, upload surefire+failsafe reports),
+  `frontend` (lint, `tsc --noEmit`, Vitest, build), `e2e` (services Postgres 16 + Redis 7 thật trên
+  runner, build+chạy backend thật với profile `local` + `JWT_SECRET` CI riêng, build+chạy frontend
+  dev server thật, chạy bộ Playwright E2E của Phase 11 thật, upload report khi fail).
+  **Bug thật phát hiện khi rà `playwright.config.ts` trước khi viết job `e2e`**: hardcode
+  `executablePath: "/opt/pw-browsers/chromium"` (chỉ tồn tại trong sandbox phát triển) — sẽ crash
+  ngay trên GitHub Actions runner (không có đường dẫn này, CI tự `playwright install --with-deps
+  chromium` rồi để Playwright tự tìm browser mặc định). Đã sửa bằng điều kiện `existsSync` — verify
+  lại: 5/5 test Playwright vẫn pass trong sandbox sau khi sửa (nhánh `existsSync` vẫn đúng ở đây).
+- `scripts/backup.sh`/`scripts/restore.sh` (pg_dump/psql qua `docker compose exec postgres`, đọc
+  `.env` ở root, `restore.sh` có bước xác nhận trước khi ghi đè). `README.md` thay phần Docker
+  Compose placeholder bằng hướng dẫn thật (`--env-file .env`, bảng so sánh biến môi trường 2 kịch
+  bản triển khai) + mục "Vận hành" (backup/restore, tóm tắt CI).
+- **Giới hạn môi trường (nhất quán với Phase 3/11)**: sandbox làm Phase 12 vẫn KHÔNG có Docker
+  daemon (`docker ps`/`service docker start` đều lỗi) — Dockerfile/compose chỉ verify được qua
+  `docker compose config` (thay thế biến + resolve path đúng) và review thủ công kỹ lưỡng, **chưa
+  chạy được `docker build`/`docker compose up` thật** trong phiên này. Sẽ được GitHub Actions runner
+  (có Docker daemon thật) xác nhận khi job `e2e` chạy (`mvn -B -q package` + start jar thật, dù
+  không qua Dockerfile mà chạy trực tiếp — bản thân Dockerfile build image thì chưa có job CI nào
+  build/push image, chỉ mới viết đúng cú pháp và review thủ công).
 
 ### Đã chốt (FH-1 → FH-16 — Redesign giao diện FruitHouse + tính năng mới)
 Sau Phase 10, toàn bộ FE được redesign lại theo mockup FruitHouse (theme jade, sidebar tối màu cố
@@ -206,9 +254,11 @@ Quanlycuahang/
 │       │           └── V4__invoice_fields.sql     (orders.cash_received/change_amount, customers.email, store_name/store_tax_code)
 │       └── test/java/com/quanlycuahang/erp/
 │           ├── product/ProductRepositoryIT.java
-│           ├── sales/pricing/OrderPricingServiceTest.java
+│           ├── partner/DebtRepositoryIT.java             (Phase 11)
+│           ├── sales/OrderRepositoryRevenueIT.java        (Phase 11)
+│           ├── sales/pricing/OrderPricingServiceTest.java (23 case, Phase 11)
 │           └── operation/invoice/InvoiceDetailAssemblerTest.java
-├── docker/                          # rỗng — cấu hình ở Phase 12
+├── docker/                          # docker-compose.yml, nginx.conf (Phase 12)
 ├── docs/
 │   ├── conventions.md, PROJECT_STATE.md
 │   ├── phase1/  (8 file — permission matrix, business specs, diagrams)
@@ -221,7 +271,9 @@ Quanlycuahang/
 │   ├── phase8/pos-module.md
 │   ├── phase9/invoice-module.md
 │   └── phase10/reports-module.md
-├── scripts/                         # rỗng
+├── client/e2e/                      # Playwright E2E chính thức (Phase 11): auth, pos-checkout, debts, shifts
+├── scripts/                         # backup.sh, restore.sh (Phase 12)
+├── .github/workflows/ci.yml         # backend / frontend / e2e (Phase 12)
 ├── .env.example, .gitignore, README.md
 ```
 
@@ -255,9 +307,11 @@ Quanlycuahang/
   tải Blob (endpoint export cần header Authorization) — xem `docs/phase10/reports-module.md`.
 
 ### Nợ kỹ thuật / dang dở
-- Chưa có Dockerfile/docker-compose.yml — Phase 12
-- Chưa có CI (GitHub Actions) — Phase 12
-- `ProductRepositoryIT` dùng Testcontainers — viết đúng chuẩn nhưng **chưa chạy được trong sandbox này** (không có Docker daemon khả dụng); đã verify tương đương bằng PostgreSQL/Redis cài trực tiếp + `spring-boot:run` thật (xem trên) — cần chạy lại `mvn verify` trên máy/CI có Docker trước khi coi là đã pass CI
+- Dockerfile/docker-compose.yml/CI đã có (Phase 12) nhưng **chưa từng chạy `docker build`/
+  `docker compose up` thật trong sandbox này** (không có Docker daemon) — chỉ verify qua
+  `docker compose config` + review thủ công; cần build/chạy thật lần đầu trên máy/CI có Docker
+  trước khi coi image là đã kiểm chứng đầy đủ.
+- `ProductRepositoryIT`/`DebtRepositoryIT`/`OrderRepositoryRevenueIT` dùng Testcontainers — viết đúng chuẩn, giờ đã được `maven-failsafe-plugin` (Phase 12) nhận diện và chạy đúng ở phase `verify`, nhưng **chưa tự chạy được trong sandbox này** (không có Docker daemon khả dụng); đã verify tương đương bằng PostgreSQL/Redis cài trực tiếp + `spring-boot:run` thật (xem trên) — sẽ chạy thật lần đầu trên GitHub Actions (runner có Docker daemon sẵn, xem `.github/workflows/ci.yml` job `backend`)
 - `stock_transfers` (chuyển kho đa chi nhánh, COULD) chưa thiết kế
 - Wireframe hiện là mô tả text + Mermaid box diagram (chưa phải hình ảnh/Figma) — đủ chi tiết để code Phase 5 nhưng không có mockup trực quan; có thể bổ sung sau nếu cần
 - Chưa có `BranchController` (CRUD chi nhánh qua API) — chỉ 1 chi nhánh seed sẵn, đủ cho Phase 8 test nhưng cần bổ sung trước khi FE cần màn quản lý đa chi nhánh (Phase 10: `ReportsPage` cũng chưa có bộ lọc chi nhánh vì lý do này)
@@ -299,9 +353,26 @@ Quanlycuahang/
 - **Thiếu**: chưa có Controller/Service (đúng phạm vi Phase 3, sẽ có ở Phase 6 trở đi); seed data đơn giản hóa (20 đơn không có chiết khấu/voucher — đủ cho dev/demo, kịch bản đầy đủ để ở Phase 11 test).
 - **Rủi ro**: `ProductRepositoryIT` chưa được CI thực thi trong phiên làm việc này do thiếu Docker — cần chạy xác nhận trên môi trường có Docker trước khi merge.
 
+### Tự đánh giá Phase 12
+- **Mạnh**: đúng kỷ luật "verify bằng chạy thật" dù bị giới hạn Docker daemon — thay vì chỉ đọc lại
+  code, đã chủ động thử `mvn verify`/`docker compose config`/`npx playwright test` trước khi coi là
+  xong, và nhờ vậy phát hiện 3 lỗi thật không lộ ra nếu chỉ viết file rồi dừng: thiếu
+  `maven-failsafe-plugin` (IT test câm lặng từ Phase 3), 29 file lệch format (chưa từng qua
+  spotless), và `playwright.config.ts` hardcode path sẽ crash job `e2e` trên CI thật.
+- **Thiếu**: chưa build/chạy được `docker build`/`docker compose up` thật (không có Docker daemon
+  trong sandbox) — đây là rủi ro lớn nhất còn lại của Phase 12, vì Dockerfile/compose mới được
+  review thủ công + `docker compose config`, chưa có bằng chứng runtime thật (ví dụ: healthcheck
+  có thật sự pass, image build có lỗi dependency ẩn nào không). Cần chạy thật lần đầu ngay khi có
+  máy/CI có Docker trước khi tin tưởng hoàn toàn.
+- **Rủi ro**: `.github/workflows/ci.yml` bản thân nó cũng chưa từng chạy thật trên GitHub Actions
+  (chỉ viết đúng cú pháp dựa trên tài liệu + kinh nghiệm, review kỹ từng bước) — cần theo dõi lần
+  chạy CI đầu tiên sau khi push để xử lý các lỗi phát sinh chỉ lộ ra trên runner thật (khác biệt
+  version tool, timing khởi động service, quyền Docker trên runner...).
+
 ### Kế tiếp
-Phase 0–11 của master prompt đã hoàn tất (Khởi tạo, Nghiệp vụ, Kiến trúc, Database, Thiết kế giao
+Phase 0–12 của master prompt đã hoàn tất (Khởi tạo, Nghiệp vụ, Kiến trúc, Database, Thiết kế giao
 diện, Frontend Foundation, Backend Foundation, Sản phẩm & Kho, Bán hàng POS, Hóa đơn, Báo cáo,
-Testing), cộng thêm FH-1 → FH-16 (redesign FruitHouse + 6 tính năng mới ngoài phạm vi master
-prompt gốc). Phase tiếp theo chưa được yêu cầu thực hiện:
-- Phase 12: DevOps & tài liệu (Docker Compose, CI, README vận hành)
+Testing, DevOps & tài liệu), cộng thêm FH-1 → FH-16 (redesign FruitHouse + 6 tính năng mới ngoài
+phạm vi master prompt gốc). Không còn phase nào được tài liệu dự án liệt kê là chưa làm; việc còn
+lại là xác nhận CI/Docker chạy thật lần đầu trên môi trường có Docker daemon (xem "Nợ kỹ thuật" và
+"Tự đánh giá Phase 12" ở trên) — không phải công việc phát triển mới.

@@ -32,3 +32,6 @@ docker/postgres-data/
 server/uploads/
 dump.rdb
 *.rdb
+
+# --- Backups (scripts/backup.sh) ---
+/backups/
