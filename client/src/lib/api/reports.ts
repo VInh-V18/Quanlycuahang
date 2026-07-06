@@ -5,6 +5,8 @@ export interface RevenueBucket {
   label: string;
   revenue: number;
   orderCount: number;
+  costOfGoodsSold: number;
+  grossProfit: number;
 }
 
 export interface GrossProfit {

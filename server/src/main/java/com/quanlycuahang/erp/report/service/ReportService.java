@@ -157,7 +157,7 @@ public class ReportService {
 
   private static RevenueBucketResponse toRevenueBucket(Object[] row) {
     return new RevenueBucketResponse(
-        (String) row[0], (BigDecimal) row[1], ((Number) row[2]).longValue());
+        (String) row[0], (BigDecimal) row[1], ((Number) row[2]).longValue(), (BigDecimal) row[3]);
   }
 
   private static OffsetDateTime startOfDay(LocalDate date) {

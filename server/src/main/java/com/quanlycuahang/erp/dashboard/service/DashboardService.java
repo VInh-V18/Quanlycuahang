@@ -131,7 +131,10 @@ public class DashboardService {
     List<RevenueBucketResponse> filled = new java.util.ArrayList<>();
     for (LocalDate date = from; !date.isAfter(to); date = date.plusDays(1)) {
       RevenueBucketResponse existing = findByLabel(queried, date);
-      filled.add(existing != null ? existing : new RevenueBucketResponse(date.format(LABEL_FORMAT), BigDecimal.ZERO, 0));
+      filled.add(
+          existing != null
+              ? existing
+              : new RevenueBucketResponse(date.format(LABEL_FORMAT), BigDecimal.ZERO, 0, BigDecimal.ZERO));
     }
     return filled;
   }
