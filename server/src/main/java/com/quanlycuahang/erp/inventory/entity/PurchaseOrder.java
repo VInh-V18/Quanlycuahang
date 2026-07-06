@@ -38,6 +38,9 @@ public class PurchaseOrder extends BaseEntity {
   @Column(name = "total_amount", nullable = false)
   private BigDecimal totalAmount;
 
+  @Column(name = "discount_amount", nullable = false)
+  private BigDecimal discountAmount = BigDecimal.ZERO;
+
   public Supplier getSupplier() {
     return supplier;
   }
@@ -76,5 +79,13 @@ public class PurchaseOrder extends BaseEntity {
 
   public void setTotalAmount(BigDecimal totalAmount) {
     this.totalAmount = totalAmount;
+  }
+
+  public BigDecimal getDiscountAmount() {
+    return discountAmount;
+  }
+
+  public void setDiscountAmount(BigDecimal discountAmount) {
+    this.discountAmount = discountAmount;
   }
 }

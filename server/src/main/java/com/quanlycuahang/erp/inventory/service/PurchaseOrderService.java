@@ -162,10 +162,12 @@ public class PurchaseOrderService {
       total = total.add(itemRequest.getQuantity().multiply(itemRequest.getUnitPrice()));
     }
 
+    BigDecimal discount = request.getDiscountAmount() == null ? BigDecimal.ZERO : request.getDiscountAmount();
     purchaseOrder.setTotalAmount(total);
+    purchaseOrder.setDiscountAmount(discount);
     purchaseOrder = purchaseOrderRepository.save(purchaseOrder);
 
-    BigDecimal unpaid = total.subtract(request.getPaidAmount());
+    BigDecimal unpaid = total.subtract(discount).subtract(request.getPaidAmount());
     if (unpaid.compareTo(BigDecimal.ZERO) > 0) {
       Debt debt = new Debt();
       debt.setSupplier(supplier);

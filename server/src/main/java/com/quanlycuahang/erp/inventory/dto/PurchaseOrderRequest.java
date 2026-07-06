@@ -18,6 +18,9 @@ public class PurchaseOrderRequest {
   /** So tien da tra ngay (co the < tong tien -> phan con lai ghi cong no phai tra NCC, B4). */
   @NotNull @PositiveOrZero private BigDecimal paidAmount = BigDecimal.ZERO;
 
+  /** Chiet khau NCC tren tong tien hang (FH-6) — tru truoc khi tinh so con phai tra. */
+  @PositiveOrZero private BigDecimal discountAmount = BigDecimal.ZERO;
+
   public Long getSupplierId() {
     return supplierId;
   }
@@ -48,5 +51,13 @@ public class PurchaseOrderRequest {
 
   public void setPaidAmount(BigDecimal paidAmount) {
     this.paidAmount = paidAmount;
+  }
+
+  public BigDecimal getDiscountAmount() {
+    return discountAmount;
+  }
+
+  public void setDiscountAmount(BigDecimal discountAmount) {
+    this.discountAmount = discountAmount;
   }
 }

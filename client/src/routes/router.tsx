@@ -18,6 +18,16 @@ const ProductsPage = lazy(() =>
 const ProductFormPage = lazy(() =>
   import("@/pages/products/ProductFormPage").then((m) => ({ default: m.ProductFormPage })),
 );
+const PurchaseOrdersPage = lazy(() =>
+  import("@/pages/purchase-orders/PurchaseOrdersPage").then((m) => ({
+    default: m.PurchaseOrdersPage,
+  })),
+);
+const PurchaseOrderCreatePage = lazy(() =>
+  import("@/pages/purchase-orders/PurchaseOrderCreatePage").then((m) => ({
+    default: m.PurchaseOrderCreatePage,
+  })),
+);
 const PosPage = lazy(() => import("@/pages/pos/PosPage").then((m) => ({ default: m.PosPage })));
 const InvoicePrintPage = lazy(() =>
   import("@/pages/invoices/InvoicePrintPage").then((m) => ({ default: m.InvoicePrintPage })),
@@ -98,6 +108,22 @@ const router = createBrowserRouter([
         element: withSuspense(
           <RequirePermission perm="product:update">
             <ProductFormPage />
+          </RequirePermission>,
+        ),
+      },
+      {
+        path: "/purchase-orders",
+        element: withSuspense(
+          <RequirePermission perm="purchase-order:view">
+            <PurchaseOrdersPage />
+          </RequirePermission>,
+        ),
+      },
+      {
+        path: "/purchase-orders/new",
+        element: withSuspense(
+          <RequirePermission perm="purchase-order:create">
+            <PurchaseOrderCreatePage />
           </RequirePermission>,
         ),
       },

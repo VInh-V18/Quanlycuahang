@@ -12,6 +12,7 @@ public class PurchaseOrderResponse {
   private Long branchId;
   private String status;
   private BigDecimal totalAmount;
+  private BigDecimal discountAmount;
   private List<PurchaseOrderItemResponse> items;
   private Instant createdAt;
 
@@ -61,6 +62,14 @@ public class PurchaseOrderResponse {
 
   public void setTotalAmount(BigDecimal totalAmount) {
     this.totalAmount = totalAmount;
+  }
+
+  public BigDecimal getDiscountAmount() {
+    return discountAmount;
+  }
+
+  public void setDiscountAmount(BigDecimal discountAmount) {
+    this.discountAmount = discountAmount;
   }
 
   public List<PurchaseOrderItemResponse> getItems() {

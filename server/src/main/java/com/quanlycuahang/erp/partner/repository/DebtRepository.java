@@ -1,6 +1,7 @@
 package com.quanlycuahang.erp.partner.repository;
 
 import com.quanlycuahang.erp.partner.entity.Debt;
+import java.math.BigDecimal;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -15,6 +16,12 @@ public interface DebtRepository extends JpaRepository<Debt, Long> {
   Page<Debt> findBySupplierId(Long supplierId, Pageable pageable);
 
   java.util.List<Debt> findByReferenceTypeAndReferenceId(String referenceType, Long referenceId);
+
+  /** Tong cong no con du (chua co co che tru dan qua DebtPayment — xem PROJECT_STATE FH-12). */
+  @Query(
+      "SELECT COALESCE(SUM(d.amount), 0) FROM Debt d "
+          + "WHERE d.supplier.id = :supplierId AND d.direction = 'payable' AND d.amount > 0")
+  BigDecimal sumOutstandingBySupplierId(@Param("supplierId") Long supplierId);
 
   /**
    * Tuoi no tinh tu ngay tao Debt (created_at) den hien tai, chia 4 muc chuan (0-30/31-60/61-90/
