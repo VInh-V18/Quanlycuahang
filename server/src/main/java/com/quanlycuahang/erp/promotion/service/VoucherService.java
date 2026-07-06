@@ -60,10 +60,16 @@ public class VoucherService {
     return new VoucherValidationResult(voucher, discountAmount);
   }
 
+  /**
+   * saveAndFlush (khong phai save thuong) de phat hien xung dot NGAY trong transaction hien tai —
+   * giong Inventory (OrderService), chan 2 don dung cung 1 voucher gan het luot dong thoi deu tang
+   * used_count thanh cong (@Version tren Voucher se nem OptimisticLockingFailureException, duoc
+   * OrderService bat rieng va dich thanh loi nghiep vu ro rang).
+   */
   @Transactional
   public void recordUsage(Voucher voucher, Order order) {
     voucher.setUsedCount(voucher.getUsedCount() + 1);
-    voucherRepository.save(voucher);
+    voucherRepository.saveAndFlush(voucher);
 
     VoucherUsage usage = new VoucherUsage();
     usage.setVoucher(voucher);

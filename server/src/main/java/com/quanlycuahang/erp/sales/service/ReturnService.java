@@ -1,5 +1,6 @@
 package com.quanlycuahang.erp.sales.service;
 
+import com.quanlycuahang.erp.auth.security.BranchAccessGuard;
 import com.quanlycuahang.erp.auth.security.CurrentUserProvider;
 import com.quanlycuahang.erp.common.exception.BusinessRuleException;
 import com.quanlycuahang.erp.common.exception.ResourceNotFoundException;
@@ -43,6 +44,7 @@ public class ReturnService {
   private final InventoryTransactionRepository inventoryTransactionRepository;
   private final DebtRepository debtRepository;
   private final CurrentUserProvider currentUserProvider;
+  private final BranchAccessGuard branchAccessGuard;
 
   public ReturnService(
       OrderRepository orderRepository,
@@ -52,7 +54,8 @@ public class ReturnService {
       InventoryRepository inventoryRepository,
       InventoryTransactionRepository inventoryTransactionRepository,
       DebtRepository debtRepository,
-      CurrentUserProvider currentUserProvider) {
+      CurrentUserProvider currentUserProvider,
+      BranchAccessGuard branchAccessGuard) {
     this.orderRepository = orderRepository;
     this.orderItemRepository = orderItemRepository;
     this.returnRepository = returnRepository;
@@ -61,6 +64,7 @@ public class ReturnService {
     this.inventoryTransactionRepository = inventoryTransactionRepository;
     this.debtRepository = debtRepository;
     this.currentUserProvider = currentUserProvider;
+    this.branchAccessGuard = branchAccessGuard;
   }
 
   @Transactional
@@ -69,6 +73,7 @@ public class ReturnService {
         orderRepository
             .findById(request.getOrderId())
             .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay don hang"));
+    branchAccessGuard.assertAccess(order.getBranch().getId());
 
     OrderStatus currentStatus = OrderStatus.fromValue(order.getStatus());
     if (currentStatus != OrderStatus.COMPLETED && currentStatus != OrderStatus.PARTIALLY_RETURNED) {

@@ -1,9 +1,11 @@
 package com.quanlycuahang.erp.operation.service;
 
 import com.quanlycuahang.erp.auth.entity.User;
+import com.quanlycuahang.erp.auth.security.BranchAccessGuard;
 import com.quanlycuahang.erp.auth.security.CurrentUserProvider;
 import com.quanlycuahang.erp.common.dto.ApiResponse;
 import com.quanlycuahang.erp.common.exception.BusinessRuleException;
+import com.quanlycuahang.erp.common.exception.PermissionDeniedException;
 import com.quanlycuahang.erp.common.exception.ResourceNotFoundException;
 import com.quanlycuahang.erp.operation.dto.CashTransactionRequest;
 import com.quanlycuahang.erp.operation.dto.CashTransactionResponse;
@@ -42,6 +44,7 @@ public class ShiftService {
   private final OrderRepository orderRepository;
   private final ReturnRepository returnRepository;
   private final CurrentUserProvider currentUserProvider;
+  private final BranchAccessGuard branchAccessGuard;
 
   public ShiftService(
       ShiftRepository shiftRepository,
@@ -49,13 +52,15 @@ public class ShiftService {
       OrderPaymentRepository orderPaymentRepository,
       OrderRepository orderRepository,
       ReturnRepository returnRepository,
-      CurrentUserProvider currentUserProvider) {
+      CurrentUserProvider currentUserProvider,
+      BranchAccessGuard branchAccessGuard) {
     this.shiftRepository = shiftRepository;
     this.cashTransactionRepository = cashTransactionRepository;
     this.orderPaymentRepository = orderPaymentRepository;
     this.orderRepository = orderRepository;
     this.returnRepository = returnRepository;
     this.currentUserProvider = currentUserProvider;
+    this.branchAccessGuard = branchAccessGuard;
   }
 
   @Transactional
@@ -123,9 +128,18 @@ public class ShiftService {
     return toDetail(shiftRepository.save(shift));
   }
 
+  /**
+   * permission-matrix.md: shift:view cua cashier chi la "ca cua minh", owner/manager moi xem duoc
+   * lich su toan bo — truoc day endpoint nay tra ve MOI ca cua MOI nhan vien khong loc gi ca, du
+   * nguoi goi la cashier.
+   */
   @Transactional(readOnly = true)
   public ApiResponse<List<ShiftSummaryResponse>> history(String status, Pageable pageable) {
-    Page<Shift> page = shiftRepository.search(status, pageable);
+    User currentUser = currentUserProvider.requireCurrentUser();
+    Page<Shift> page =
+        BranchAccessGuard.hasFullAccess(currentUser)
+            ? shiftRepository.search(status, pageable)
+            : shiftRepository.searchByOpenedBy(currentUser.getId(), status, pageable);
     return ApiResponse.page(page.map(ShiftService::toSummary));
   }
 
@@ -156,10 +170,24 @@ public class ShiftService {
     return toResponse(cashTransactionRepository.save(tx));
   }
 
+  /**
+   * Chan IDOR: truoc day chi kiem tra permission (shift:view/close/...) o Controller, khong doi
+   * chieu ca lam viec thuoc chi nhanh/nguoi nao — bat ky cashier nao co quyen deu dong/xem/ghi thu
+   * chi duoc ca cua nguoi khac o bat ky chi nhanh nao (phat hien khi rieng soat sau khi da sua
+   * Order/ Inventory/...). owner/manager van xem/thao tac duoc moi ca (dung permission-matrix.md).
+   */
   private Shift requireShift(Long id) {
-    return shiftRepository
-        .findById(id)
-        .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay ca lam viec"));
+    Shift shift =
+        shiftRepository
+            .findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay ca lam viec"));
+    branchAccessGuard.assertAccess(shift.getBranch().getId());
+    User currentUser = currentUserProvider.requireCurrentUser();
+    if (!BranchAccessGuard.hasFullAccess(currentUser)
+        && !shift.getOpenedBy().getId().equals(currentUser.getId())) {
+      throw new PermissionDeniedException("Ban chi duoc thao tac tren ca lam viec cua chinh minh");
+    }
+    return shift;
   }
 
   private BigDecimal computeExpectedCash(Shift shift, OffsetDateTime asOf) {

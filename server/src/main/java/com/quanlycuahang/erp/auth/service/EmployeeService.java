@@ -10,11 +10,14 @@ import com.quanlycuahang.erp.auth.repository.RoleRepository;
 import com.quanlycuahang.erp.auth.repository.UserRepository;
 import com.quanlycuahang.erp.auth.security.CurrentUserProvider;
 import com.quanlycuahang.erp.common.exception.BusinessRuleException;
+import com.quanlycuahang.erp.common.exception.PermissionDeniedException;
 import com.quanlycuahang.erp.common.exception.ResourceNotFoundException;
 import com.quanlycuahang.erp.system.repository.BranchRepository;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -85,12 +88,30 @@ public class EmployeeService {
           "EMPLOYEE_CANNOT_DEACTIVATE_SELF", "Khong the tu vo hieu hoa tai khoan dang dang nhap");
     }
 
+    Set<Long> currentRoleIds =
+        user.getRoles().stream().map(Role::getId).collect(Collectors.toSet());
+    if (!currentRoleIds.equals(request.getRoleIds()) && !hasManagePermissionAuthority()) {
+      // employee:update (owner+manager) chi cho sua thong tin co ban — doi vai tro rieng can
+      // employee:manage-permission (chi owner, permission-matrix.md). Truoc day khong tach rieng
+      // nen manager co the tu nang quyen minh/nguoi khac len owner qua chinh endpoint nay (FE co
+      // an nut nhung API goc khong chan) — phat hien khi rieng soat.
+      throw new PermissionDeniedException(
+          "Ban khong co quyen doi vai tro nhan vien (can quyen employee:manage-permission)");
+    }
+
     user.setFullName(request.getFullName());
     user.setPhone(request.getPhone());
     user.setActive(request.getActive());
     user.setRoles(resolveRoles(request.getRoleIds()));
 
     return toResponse(userRepository.save(user));
+  }
+
+  private static boolean hasManagePermissionAuthority() {
+    var authentication = SecurityContextHolder.getContext().getAuthentication();
+    return authentication != null
+        && authentication.getAuthorities().stream()
+            .anyMatch(a -> a.getAuthority().equals("employee:manage-permission"));
   }
 
   @Transactional

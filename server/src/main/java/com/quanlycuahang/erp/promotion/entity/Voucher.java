@@ -4,12 +4,17 @@ import com.quanlycuahang.erp.common.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.Where;
 
-/** used_count la denormalize co chu dich de verify nhanh o POS (D4, khong COUNT(*) moi lan). */
+/**
+ * used_count la denormalize co chu dich de verify nhanh o POS (D4, khong COUNT(*) moi
+ * lan). @Version cho optimistic locking (giong Inventory) — thieu truoc day khien 2 don dung cung 1
+ * voucher gan het luot dong thoi co the deu tang used_count thanh cong, vuot qua max_usage that su.
+ */
 @Entity
 @Table(name = "vouchers")
 @SQLDelete(sql = "UPDATE vouchers SET deleted_at = now() WHERE id = ?")
@@ -39,6 +44,10 @@ public class Voucher extends BaseEntity {
 
   @Column(name = "is_active", nullable = false)
   private boolean active = true;
+
+  @Version
+  @Column(name = "version", nullable = false)
+  private Long version;
 
   public String getCode() {
     return code;

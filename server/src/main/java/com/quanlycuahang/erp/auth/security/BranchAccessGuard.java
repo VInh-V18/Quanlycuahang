@@ -45,7 +45,11 @@ public class BranchAccessGuard {
     }
   }
 
-  private static boolean hasFullAccess(User user) {
+  /**
+   * owner/manager quan ly toan chuoi — dung lai o cac Service can phan biet "quan ly" vs "nhan vien
+   * thuong" (vd ShiftService: cashier chi xem duoc ca cua chinh minh).
+   */
+  public static boolean hasFullAccess(User user) {
     return user.getRoles().stream()
         .anyMatch(role -> FULL_ACCESS_ROLE_CODES.contains(role.getCode()));
   }

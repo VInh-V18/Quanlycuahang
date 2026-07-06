@@ -353,7 +353,17 @@ public class OrderService {
     }
 
     if (voucher != null) {
-      voucherService.recordUsage(voucher, order);
+      try {
+        voucherService.recordUsage(voucher, order);
+      } catch (org.springframework.dao.OptimisticLockingFailureException ex) {
+        // @Version tren Voucher (them cung fix nay) phat hien 2 don dung cung 1 voucher gan het
+        // luot cung luc — dich thanh loi ro rang thay vi de GlobalExceptionHandler map chung
+        // thanh PRODUCT_OUT_OF_STOCK (sai ngu canh, gay hieu lam la ton kho chu khong phai
+        // voucher).
+        throw new BusinessRuleException(
+            "VOUCHER_INVALID",
+            "Voucher vua het luot su dung do co don khac dung cung luc, vui long tai lai gio hang");
+      }
     }
 
     Invoice invoice = new Invoice();
