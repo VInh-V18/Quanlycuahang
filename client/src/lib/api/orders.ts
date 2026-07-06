@@ -66,9 +66,43 @@ export interface OrderDetail {
   totalAmount: number;
   items: OrderItem[];
   createdAt: string;
+  invoiceId: number | null;
+  invoiceNumber: string | null;
 }
 
 export async function getOrder(id: number): Promise<OrderDetail> {
   const response = await apiClient.get<ApiSuccess<OrderDetail>>(`/orders/${id}`);
+  return response.data.data;
+}
+
+export interface OrderCreateLine {
+  productId: number;
+  quantity: number;
+  lineDiscountAmount: number;
+}
+
+export interface OrderCreatePayment {
+  method: string;
+  amount: number;
+}
+
+export interface OrderCreateRequest {
+  branchId: number;
+  customerId?: number;
+  voucherCode?: string;
+  orderDiscountAmount: number;
+  cashReceived?: number;
+  expectedTotalAmount: number;
+  lines: OrderCreateLine[];
+  payments: OrderCreatePayment[];
+}
+
+export async function createOrder(
+  request: OrderCreateRequest,
+  idempotencyKey: string,
+): Promise<OrderDetail> {
+  const response = await apiClient.post<ApiSuccess<OrderDetail>>("/orders", request, {
+    headers: { "Idempotency-Key": idempotencyKey },
+  });
   return response.data.data;
 }

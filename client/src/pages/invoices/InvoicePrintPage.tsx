@@ -6,13 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { InvoiceA4 } from "@/components/invoice/InvoiceA4";
+import { InvoiceK58 } from "@/components/invoice/InvoiceK58";
 import { InvoiceK80 } from "@/components/invoice/InvoiceK80";
 import { getInvoiceById } from "@/lib/api/invoices";
 import { getApiErrorMessage } from "@/lib/http/errors";
 
-type Format = "k80" | "a4";
+type Format = "k58" | "k80" | "a4";
 
 const PAGE_CSS: Record<Format, string> = {
+  k58: "@page { size: 58mm auto; margin: 0; }",
   k80: "@page { size: 80mm auto; margin: 0; }",
   a4: "@page { size: A4; margin: 0; }",
 };
@@ -38,6 +40,7 @@ export function InvoicePrintPage() {
       <div className="no-print mb-6 flex items-center justify-between">
         <Tabs value={format} onValueChange={(v) => setFormat(v as Format)}>
           <TabsList>
+            <TabsTrigger value="k58">Khổ K58</TabsTrigger>
             <TabsTrigger value="k80">Khổ K80</TabsTrigger>
             <TabsTrigger value="a4">Khổ A4</TabsTrigger>
           </TabsList>
@@ -51,7 +54,9 @@ export function InvoicePrintPage() {
       {isLoading && <Skeleton className="mx-auto h-96 w-full max-w-2xl" />}
       {isError && <p className="text-center text-destructive">{getApiErrorMessage(error)}</p>}
       {invoice &&
-        (format === "k80" ? (
+        (format === "k58" ? (
+          <InvoiceK58 invoice={invoice} lookupUrl={lookupUrl} />
+        ) : format === "k80" ? (
           <InvoiceK80 invoice={invoice} lookupUrl={lookupUrl} />
         ) : (
           <InvoiceA4 invoice={invoice} lookupUrl={lookupUrl} />
