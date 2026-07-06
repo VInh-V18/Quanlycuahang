@@ -1,4 +1,24 @@
-## PROJECT_STATE — sau Phase 9 — 2026-07-06
+## PROJECT_STATE — sau Phase 10 — 2026-07-06
+
+### Đã chốt (Phase 10 — Báo cáo)
+- **Bug thật phát hiện qua verify actuator**: `spring-boot-starter-mail` (thêm ở Phase 9) tự đăng
+  ký `MailHealthIndicator` góp phần vào status tổng hợp `/actuator/health` — SMTP gián đoạn tạm
+  thời (không liên quan gì đến khả năng phục vụ của hệ thống) kéo cả `/actuator/health` xuống
+  `DOWN`, mâu thuẫn trực tiếp nguyên tắc Phase 9 "email không được ảnh hưởng ngược lại luồng bán
+  hàng" — nếu dùng làm readiness probe (K8s/load balancer) sẽ loại bỏ nhầm 1 instance đang bán hàng
+  bình thường. Đã sửa bằng `management.health.mail.enabled: false`. Chi tiết:
+  `docs/phase10/reports-module.md`.
+- 7 endpoint báo cáo (doanh thu 5 chiều nhóm, lợi nhuận gộp, top SP, top KH, hiệu suất nhân viên,
+  giá trị tồn kho, công nợ theo tuổi nợ) dùng `@Query(nativeQuery = true)` trực tiếp trên
+  orders/order_items/returns/debts/inventory — chưa cần bảng tổng hợp `daily_sales_summary`.
+  Xuất Excel qua Apache POI (`ReportExcelExporter` dùng chung mọi loại bảng).
+- `ReportsPage` FE: biểu đồ Recharts (1 chuỗi doanh thu), bảng tái dùng `DataTable` (Phase 5), xuất
+  Excel qua tải Blob (endpoint export cần header Authorization, không dùng `<a href>` được).
+- Đã verify toàn bộ số liệu đối chiếu trực tiếp với SQL tay và dữ liệu seed + đơn test Phase 8/9
+  (doanh thu theo chi nhánh khớp theo thu ngân, lợi nhuận gộp khớp từng đồng, giá trị tồn kho theo
+  danh mục cộng lại khớp theo chi nhánh, phân quyền đúng ma trận, file Excel mở bằng `openpyxl`
+  xác nhận đúng dữ liệu) — cả qua curl lẫn qua Playwright + Chromium thật. Bảng đầy đủ:
+  `docs/phase10/reports-module.md`.
 
 ### Đã chốt (Phase 9 — Module Hóa đơn)
 - `GET /api/v1/invoices/{id}` (quyền `invoice:view`) + `GET /api/v1/invoices/lookup/{lookupCode}`
@@ -114,10 +134,10 @@ Quanlycuahang/
 │   │   │   ├── ui/          # 18 primitive shadcn (button, input, dialog, form, toast...)
 │   │   │   ├── layout/      # MainLayout, AuthLayout, PosLayout, Sidebar, Topbar, ThemeToggle
 │   │   │   └── common/      # DataTable, FormField, ConfirmDialog, Money, DateRangePicker, PermissionGate
-│   │   ├── pages/           # auth/LoginPage, DashboardPage, products/ProductsPage, pos/PosPage, invoices/{Print,Lookup}Page, NotFound/Forbidden
+│   │   ├── pages/           # auth/LoginPage, DashboardPage, products/ProductsPage, pos/PosPage, invoices/{Print,Lookup}Page, reports/ReportsPage, NotFound/Forbidden
 │   │   ├── routes/          # router.tsx, RequireAuth, RequirePermission
 │   │   ├── store/           # index.ts (Redux + persist), slices/{auth,cart,ui}Slice
-│   │   ├── lib/{http,api}/  # apiClient (refresh interceptor), queryClient, bootstrap, auth.ts, products.ts, invoices.ts
+│   │   ├── lib/{http,api}/  # apiClient (refresh interceptor), queryClient, bootstrap, auth.ts, products.ts, invoices.ts, reports.ts
 │   │   └── types/           # api.ts (ApiResponse<T>), permission.ts
 │   ├── package.json, tailwind.config.ts, vite.config.ts, tsconfig*.json
 │   └── *.test.ts(x)         # Vitest — utils, jwt decode, Money (6 test)
@@ -138,6 +158,7 @@ Quanlycuahang/
 │       │   │   ├── sales/{entity,service,controller,dto,pricing,statemachine,repository,web}/  # Order, ParkedOrder, Return, OrderPricingService, IdempotencyInterceptor...
 │       │   │   ├── promotion/{entity,service,repository}/  # Voucher, VoucherUsage
 │       │   │   ├── operation/{entity,repository,service,controller,dto,invoice}/  # Shift, Invoice, InvoiceDetailAssembler, EInvoiceProvider, InvoiceEmailListener
+│       │   │   ├── report/{dto,service,controller,excel}/  # ReportService, ReportController, ReportExcelExporter (Phase 10)
 │       │   │   └── common/sequence/NumberSequenceService.java   # SEQUENCE atomic cho order/invoice/sku
 │       │   ├── resources/templates/invoice-email.html   # Thymeleaf (Phase 9)
 │       │   └── resources/
@@ -162,7 +183,8 @@ Quanlycuahang/
 │   ├── phase6/backend-foundation.md
 │   ├── phase7/product-inventory-module.md
 │   ├── phase8/pos-module.md
-│   └── phase9/invoice-module.md
+│   ├── phase9/invoice-module.md
+│   └── phase10/reports-module.md
 ├── scripts/                         # rỗng
 ├── .env.example, .gitignore, README.md
 ```
@@ -178,8 +200,9 @@ Quanlycuahang/
 - Khách hàng/Voucher: `/api/v1/customers`
 - Bán hàng POS: `POST /api/v1/orders` (header `Idempotency-Key`), `GET /api/v1/orders/{id}`, `POST /api/v1/orders/{id}/cancel`, `/api/v1/parked-orders` (list/park/resume), `POST /api/v1/returns`
 - Hóa đơn: `GET /api/v1/invoices/{id}` (quyền `invoice:view`), `GET /api/v1/invoices/lookup/{lookupCode}` (permitAll)
+- Báo cáo: `GET /api/v1/reports/{revenue,gross-profit,top-products,top-customers,employee-performance,inventory-value,debt-aging}` + `.../export` (Excel, cần thêm quyền `report:export`)
 - Upload: `POST /api/v1/uploads`, `GET /api/v1/uploads/{fileName}` (permitAll)
-- Actuator mặc định (`/actuator/health`, `/actuator/info`)
+- Actuator mặc định (`/actuator/health`, `/actuator/info`) — `management.health.mail.enabled: false` (Phase 10, xem Nợ kỹ thuật)
 - **Nợ**: chưa có `BranchController` (CRUD chi nhánh) — hiện chỉ có `BranchRepository`, dùng nội bộ trong `OrderService`/`SettingsService`; cần bổ sung nếu FE cần màn quản lý chi nhánh
 - Property mới `app.auth.refresh-cookie-secure` (phát hiện ở Phase 5 khi verify bằng trình duyệt thật — xem mục Phase 5 bên dưới)
 
@@ -192,6 +215,8 @@ Quanlycuahang/
 - Chi tiết đầy đủ + bảng verify bằng trình duyệt thật: `docs/phase5/frontend-foundation.md`.
 - (Phase 9) Bổ sung `InvoicePrintPage` (khổ K80/A4, route bảo vệ) và `InvoiceLookupPage` (route
   công khai `/tra-cuu/:code`, không đăng nhập) + QR qua `qrcode.react` — xem `docs/phase9/invoice-module.md`.
+- (Phase 10) `ReportsPage`: biểu đồ Recharts + bảng `DataTable` cho 7 loại báo cáo, xuất Excel qua
+  tải Blob (endpoint export cần header Authorization) — xem `docs/phase10/reports-module.md`.
 
 ### Nợ kỹ thuật / dang dở
 - Chưa có Dockerfile/docker-compose.yml — Phase 12
@@ -199,13 +224,19 @@ Quanlycuahang/
 - `ProductRepositoryIT` dùng Testcontainers — viết đúng chuẩn nhưng **chưa chạy được trong sandbox này** (không có Docker daemon khả dụng); đã verify tương đương bằng PostgreSQL/Redis cài trực tiếp + `spring-boot:run` thật (xem trên) — cần chạy lại `mvn verify` trên máy/CI có Docker trước khi coi là đã pass CI
 - `stock_transfers` (chuyển kho đa chi nhánh, COULD) chưa thiết kế
 - Wireframe hiện là mô tả text + Mermaid box diagram (chưa phải hình ảnh/Figma) — đủ chi tiết để code Phase 5 nhưng không có mockup trực quan; có thể bổ sung sau nếu cần
-- Chưa có `BranchController` (CRUD chi nhánh qua API) — chỉ 1 chi nhánh seed sẵn, đủ cho Phase 8 test nhưng cần bổ sung trước khi FE cần màn quản lý đa chi nhánh
+- Chưa có `BranchController` (CRUD chi nhánh qua API) — chỉ 1 chi nhánh seed sẵn, đủ cho Phase 8 test nhưng cần bổ sung trước khi FE cần màn quản lý đa chi nhánh (Phase 10: `ReportsPage` cũng chưa có bộ lọc chi nhánh vì lý do này)
 - Chưa seed `vouchers` mẫu trong `V2__seed_data.sql` (test Phase 8 tự thêm 1 voucher tạm qua SQL trực tiếp, không lưu vào migration) — nên bổ sung vào seed data chính thức ở phase sau nếu cần demo
+- Báo cáo "Công nợ kèm tuổi nợ" mới trả tổng hợp theo mức tuổi nợ (0-30/31-60/61-90/>90 ngày), chưa có danh sách chi tiết từng khách hàng/NCC kèm tuổi nợ riêng — cần module CRUD Công nợ (`DebtController` chưa tồn tại) để hỗ trợ duyệt/xem từng khoản
 - `DataTable` sắp xếp mới hoạt động phía client (trang hiện tại) cho `/products` vì native query Phase 7 có `ORDER BY` cố định, chưa nhận `Pageable.getSort()` động — xem `docs/phase5/frontend-foundation.md` để biết cách chuyển sang `JpaSpecificationExecutor` khi cần sắp xếp server-side thật cho từng module
 - Chưa có endpoint `/me` (thông tin user hiện tại) — FE giải mã payload JWT (`sub`, `authorities`) để lấy username/quyền hiển thị UI, `fullName` tạm dùng lại `username` vì token không có trường này; nên bổ sung `/me` nếu cần hiển thị đầy đủ hồ sơ nhân viên
 - Các trang nghiệp vụ FE (CRUD sản phẩm/khách hàng/kho, giỏ hàng POS thật, báo cáo...) chưa xây — Phase 5 chỉ là "Foundation" (scaffold + hạ tầng + component nền) đúng phạm vi master prompt, không phải toàn bộ giao diện
 - `EInvoiceProvider` mới có `NoOpEInvoiceProvider` (bean mặc định, không gửi đi đâu) — chưa tích hợp thật với Viettel S-Invoice/MISA/VNPT (cần hợp đồng thương mại thật, ngoài khả năng phiên làm việc này); xem Javadoc `EInvoiceProvider` để biết cách thay thế khi có nhà cung cấp thật
 - Email hóa đơn mới verify bằng SMTP debug server cục bộ (`python3 -m smtpd`), chưa test với SMTP thật (Gmail/SES/SendGrid...) — cần kiểm tra lại cấu hình `spring.mail.properties.mail.smtp.starttls`/`auth` khi triển khai thật với nhà cung cấp SMTP yêu cầu STARTTLS/xác thực
+
+### Tự đánh giá Phase 10
+- **Mạnh**: mọi số liệu báo cáo đều đối chiếu bằng SQL tay trực tiếp trên DB (không chỉ tin API trả về đúng) — phát hiện 1 bug thật (mail health indicator kéo sập `/actuator/health` toàn hệ thống) mà chỉ lộ ra khi gọi thật `/actuator/health` sau khi thêm dependency mail ở Phase 9, compile/test không bao giờ phát hiện được vì đó là hành vi runtime của auto-configuration, không phải lỗi logic.
+- **Thiếu**: chưa có bảng tổng hợp `daily_sales_summary`/`@Scheduled` (chấp nhận được ở quy mô mục tiêu, đã ghi rõ điều kiện cần bổ sung); "công nợ kèm tuổi nợ" mới là tổng hợp theo mức, chưa phải danh sách chi tiết từng đối tác (cần module Công nợ riêng); chưa xuất PDF báo cáo (nhất quán với quyết định "ưu tiên in trình duyệt" đã chốt ở Phase 9, chưa thêm gì mới).
+- **Rủi ro**: COGS trong lợi nhuận gộp tính theo số lượng bán gốc (không trừ hàng đã hoàn) trong khi "ảnh hưởng hoàn trả" trừ riêng theo tổng tiền hoàn — đúng theo đúng nghĩa đen công thức B4 nhưng là 1 lựa chọn kế toán đơn giản hóa (không khớp lại COGS với return cùng kỳ); nếu sau này cần độ chính xác kế toán cao hơn (return ăn khớp đúng theo lô hàng gốc), cần thiết kế lại.
 
 ### Tự đánh giá Phase 9
 - **Mạnh**: verify bằng cả ứng dụng thật (Playwright + Chromium) lẫn hạ tầng ngoài thật (SMTP debug server thật, không mock) — xác nhận đúng thứ tự event (gửi email SAU commit, không chặn luồng bán hàng), nội dung email/JSON/2 khổ in đều khớp dữ liệu gốc từng đồng; unit test "snapshot" tái sử dụng đúng số liệu đơn hàng thật đã verify ở Phase 8 thay vì bịa dữ liệu mới, tăng độ tin cậy liên phase.
@@ -233,9 +264,8 @@ Quanlycuahang/
 - **Rủi ro**: `ProductRepositoryIT` chưa được CI thực thi trong phiên làm việc này do thiếu Docker — cần chạy xác nhận trên môi trường có Docker trước khi merge.
 
 ### Kế tiếp
-Phase 0–9 của master prompt đã hoàn tất (Khởi tạo, Nghiệp vụ, Kiến trúc, Database, Thiết kế giao
-diện, Frontend Foundation, Backend Foundation, Sản phẩm & Kho, Bán hàng POS, Hóa đơn). Phase tiếp
-theo chưa được yêu cầu thực hiện:
-- Phase 10: Báo cáo (doanh thu/lợi nhuận gộp/tồn kho/công nợ, xuất Excel)
+Phase 0–10 của master prompt đã hoàn tất (Khởi tạo, Nghiệp vụ, Kiến trúc, Database, Thiết kế giao
+diện, Frontend Foundation, Backend Foundation, Sản phẩm & Kho, Bán hàng POS, Hóa đơn, Báo cáo).
+Phase tiếp theo chưa được yêu cầu thực hiện:
 - Phase 11: Testing (unit đầy đủ OrderPricingService ≥20 case, Testcontainers integration, Playwright E2E chính thức)
 - Phase 12: DevOps & tài liệu (Docker Compose, CI, README vận hành)

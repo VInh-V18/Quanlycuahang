@@ -22,6 +22,9 @@ const InvoicePrintPage = lazy(() =>
 const InvoiceLookupPage = lazy(() =>
   import("@/pages/invoices/InvoiceLookupPage").then((m) => ({ default: m.InvoiceLookupPage })),
 );
+const ReportsPage = lazy(() =>
+  import("@/pages/reports/ReportsPage").then((m) => ({ default: m.ReportsPage })),
+);
 
 function PageFallback() {
   return (
@@ -84,6 +87,14 @@ const router = createBrowserRouter([
         element: withSuspense(
           <RequirePermission perm="invoice:view">
             <InvoicePrintPage />
+          </RequirePermission>,
+        ),
+      },
+      {
+        path: "/reports",
+        element: withSuspense(
+          <RequirePermission perm="report:revenue">
+            <ReportsPage />
           </RequirePermission>,
         ),
       },

@@ -48,6 +48,12 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+  health:
+    mail:
+      # Email hoa don la best-effort, gui sau khi transaction ban hang da commit (Phase 9) —
+      # SMTP gian doan KHONG duoc phep keo /actuator/health cua toan he thong xuong DOWN
+      # (readiness probe se loai bo mot instance van dang ban hang binh thuong).
+      enabled: false
 
 springdoc:
   api-docs:
