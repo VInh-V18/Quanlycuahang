@@ -1,5 +1,6 @@
 package com.quanlycuahang.erp.report.controller;
 
+import com.quanlycuahang.erp.auth.security.BranchAccessGuard;
 import com.quanlycuahang.erp.common.dto.ApiResponse;
 import com.quanlycuahang.erp.report.dto.DebtAgingBucketResponse;
 import com.quanlycuahang.erp.report.dto.EmployeePerformanceResponse;
@@ -32,10 +33,15 @@ public class ReportController {
 
   private final ReportService reportService;
   private final ReportExcelExporter excelExporter;
+  private final BranchAccessGuard branchAccessGuard;
 
-  public ReportController(ReportService reportService, ReportExcelExporter excelExporter) {
+  public ReportController(
+      ReportService reportService,
+      ReportExcelExporter excelExporter,
+      BranchAccessGuard branchAccessGuard) {
     this.reportService = reportService;
     this.excelExporter = excelExporter;
+    this.branchAccessGuard = branchAccessGuard;
   }
 
   @GetMapping("/revenue")
@@ -156,6 +162,7 @@ public class ReportController {
   public ResponseEntity<ApiResponse<List<InventoryValueResponse>>> inventoryValue(
       @RequestParam(required = false) Long branchId,
       @RequestParam(defaultValue = "branch") String groupBy) {
+    branchAccessGuard.assertAccess(branchId);
     return ResponseEntity.ok(
         ApiResponse.success(reportService.inventoryValue(branchId, "category".equals(groupBy))));
   }
@@ -165,6 +172,7 @@ public class ReportController {
   public ResponseEntity<byte[]> exportInventoryValue(
       @RequestParam(required = false) Long branchId,
       @RequestParam(defaultValue = "branch") String groupBy) {
+    branchAccessGuard.assertAccess(branchId);
     List<InventoryValueResponse> data =
         reportService.inventoryValue(branchId, "category".equals(groupBy));
     byte[] file =
@@ -192,7 +200,8 @@ public class ReportController {
     };
   }
 
-  private static ReportFilter filter(LocalDate from, LocalDate to, Long branchId) {
+  private ReportFilter filter(LocalDate from, LocalDate to, Long branchId) {
+    branchAccessGuard.assertAccess(branchId);
     ReportFilter filter = new ReportFilter();
     filter.setFrom(from);
     filter.setTo(to);

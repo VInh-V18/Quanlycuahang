@@ -1,5 +1,6 @@
 package com.quanlycuahang.erp.dashboard.service;
 
+import com.quanlycuahang.erp.auth.security.BranchAccessGuard;
 import com.quanlycuahang.erp.dashboard.dto.DashboardSummaryResponse;
 import com.quanlycuahang.erp.dashboard.dto.RecentOrderResponse;
 import com.quanlycuahang.erp.inventory.dto.InventoryResponse;
@@ -37,20 +38,24 @@ public class DashboardService {
   private final OrderRepository orderRepository;
   private final ReturnRepository returnRepository;
   private final InventoryService inventoryService;
+  private final BranchAccessGuard branchAccessGuard;
 
   public DashboardService(
       ReportService reportService,
       OrderRepository orderRepository,
       ReturnRepository returnRepository,
-      InventoryService inventoryService) {
+      InventoryService inventoryService,
+      BranchAccessGuard branchAccessGuard) {
     this.reportService = reportService;
     this.orderRepository = orderRepository;
     this.returnRepository = returnRepository;
     this.inventoryService = inventoryService;
+    this.branchAccessGuard = branchAccessGuard;
   }
 
   @Transactional(readOnly = true)
   public DashboardSummaryResponse summary(Long branchId) {
+    branchAccessGuard.assertAccess(branchId);
     LocalDate today = LocalDate.now(APP_ZONE);
     LocalDate weekAgo = today.minusDays(6);
 

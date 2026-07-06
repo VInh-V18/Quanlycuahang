@@ -9,4 +9,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface InventoryTransactionRepository extends JpaRepository<InventoryTransaction, Long> {
 
   Page<InventoryTransaction> findByProductIdOrderByCreatedAtDesc(Long productId, Pageable pageable);
+
+  /** The kho loc theo chi nhanh (tranh lo so luong/gia von chi nhanh khac qua endpoint nay). */
+  Page<InventoryTransaction> findByProductIdAndBranchIdOrderByCreatedAtDesc(
+      Long productId, Long branchId, Pageable pageable);
 }

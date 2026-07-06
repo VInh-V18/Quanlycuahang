@@ -9,6 +9,7 @@ import org.springframework.core.io.UrlResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,6 +30,7 @@ public class FileUploadController {
   }
 
   @PostMapping
+  @PreAuthorize("hasAuthority('product:create') or hasAuthority('product:update')")
   public ResponseEntity<ApiResponse<UploadResponse>> upload(
       @RequestParam("file") MultipartFile file) {
     String storedName = fileStorageService.store(file);

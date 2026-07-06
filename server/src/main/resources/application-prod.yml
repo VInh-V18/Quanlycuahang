@@ -17,6 +17,14 @@ app:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS}
 
+# Swagger UI/OpenAPI docs permitAll trong SecurityConfig (dung cho dev) — tat han o prod de khong lo
+# toan bo API surface (endpoint, DTO schema) cho nguoi khong dang nhap (phat hien khi rieng soat).
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
 management:
   endpoint:
     health:

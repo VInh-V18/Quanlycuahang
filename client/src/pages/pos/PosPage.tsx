@@ -158,12 +158,6 @@ export function PosPage() {
     setCart((prev) => prev.map((l) => (l.productId === productId ? { ...l, quantity } : l)));
   }
 
-  function updateLineDiscount(productId: number, amount: number) {
-    setCart((prev) =>
-      prev.map((l) => (l.productId === productId ? { ...l, lineDiscountAmount: amount } : l)),
-    );
-  }
-
   function removeLine(productId: number) {
     setCart((prev) => prev.filter((l) => l.productId !== productId));
   }

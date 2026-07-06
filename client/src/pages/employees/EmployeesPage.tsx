@@ -254,7 +254,6 @@ export function EmployeesPage() {
     },
   });
 
-  const permissionsByCode = new Map((permissionsQuery.data ?? []).map((p) => [p.code, p]));
   const groupedResources = new Set(RESOURCE_GROUPS.flatMap((g) => g.resources));
   const otherResources = Array.from(
     new Set(

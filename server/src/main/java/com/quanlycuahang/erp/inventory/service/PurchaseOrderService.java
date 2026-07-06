@@ -1,5 +1,6 @@
 package com.quanlycuahang.erp.inventory.service;
 
+import com.quanlycuahang.erp.auth.security.BranchAccessGuard;
 import com.quanlycuahang.erp.auth.security.CurrentUserProvider;
 import com.quanlycuahang.erp.common.dto.ApiResponse;
 import com.quanlycuahang.erp.common.exception.ResourceNotFoundException;
@@ -51,6 +52,7 @@ public class PurchaseOrderService {
   private final DebtRepository debtRepository;
   private final PurchaseOrderMapper purchaseOrderMapper;
   private final CurrentUserProvider currentUserProvider;
+  private final BranchAccessGuard branchAccessGuard;
 
   public PurchaseOrderService(
       PurchaseOrderRepository purchaseOrderRepository,
@@ -63,7 +65,8 @@ public class PurchaseOrderService {
       ProductRepository productRepository,
       DebtRepository debtRepository,
       PurchaseOrderMapper purchaseOrderMapper,
-      CurrentUserProvider currentUserProvider) {
+      CurrentUserProvider currentUserProvider,
+      BranchAccessGuard branchAccessGuard) {
     this.purchaseOrderRepository = purchaseOrderRepository;
     this.purchaseOrderItemRepository = purchaseOrderItemRepository;
     this.inventoryRepository = inventoryRepository;
@@ -75,10 +78,12 @@ public class PurchaseOrderService {
     this.debtRepository = debtRepository;
     this.purchaseOrderMapper = purchaseOrderMapper;
     this.currentUserProvider = currentUserProvider;
+    this.branchAccessGuard = branchAccessGuard;
   }
 
   @Transactional
   public PurchaseOrderResponse create(PurchaseOrderRequest request) {
+    branchAccessGuard.assertAccess(request.getBranchId());
     Supplier supplier =
         supplierRepository
             .findById(request.getSupplierId())
@@ -187,6 +192,7 @@ public class PurchaseOrderService {
 
   @Transactional(readOnly = true)
   public ApiResponse<List<PurchaseOrderResponse>> list(Long branchId, Pageable pageable) {
+    branchAccessGuard.assertAccess(branchId);
     Page<PurchaseOrder> page =
         purchaseOrderRepository.findByBranchIdOrderByCreatedAtDesc(branchId, pageable);
     return ApiResponse.page(page.map(purchaseOrderMapper::toResponse));
@@ -198,6 +204,7 @@ public class PurchaseOrderService {
         purchaseOrderRepository
             .findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay phieu nhap"));
+    branchAccessGuard.assertAccess(purchaseOrder.getBranch().getId());
     PurchaseOrderResponse response = purchaseOrderMapper.toResponse(purchaseOrder);
     response.setItems(
         purchaseOrderItemRepository.findByPurchaseOrderId(id).stream()

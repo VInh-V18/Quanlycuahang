@@ -1,5 +1,6 @@
 package com.quanlycuahang.erp.sales.service;
 
+import com.quanlycuahang.erp.auth.security.BranchAccessGuard;
 import com.quanlycuahang.erp.auth.security.CurrentUserProvider;
 import com.quanlycuahang.erp.common.exception.ResourceNotFoundException;
 import com.quanlycuahang.erp.sales.dto.ParkedOrderRequest;
@@ -22,20 +23,24 @@ public class ParkedOrderService {
   private final BranchRepository branchRepository;
   private final ParkedOrderMapper parkedOrderMapper;
   private final CurrentUserProvider currentUserProvider;
+  private final BranchAccessGuard branchAccessGuard;
 
   public ParkedOrderService(
       ParkedOrderRepository parkedOrderRepository,
       BranchRepository branchRepository,
       ParkedOrderMapper parkedOrderMapper,
-      CurrentUserProvider currentUserProvider) {
+      CurrentUserProvider currentUserProvider,
+      BranchAccessGuard branchAccessGuard) {
     this.parkedOrderRepository = parkedOrderRepository;
     this.branchRepository = branchRepository;
     this.parkedOrderMapper = parkedOrderMapper;
     this.currentUserProvider = currentUserProvider;
+    this.branchAccessGuard = branchAccessGuard;
   }
 
   @Transactional
   public ParkedOrderResponse park(ParkedOrderRequest request) {
+    branchAccessGuard.assertAccess(request.getBranchId());
     Branch branch =
         branchRepository
             .findById(request.getBranchId())
@@ -51,6 +56,7 @@ public class ParkedOrderService {
 
   @Transactional(readOnly = true)
   public List<ParkedOrderResponse> listByBranch(Long branchId) {
+    branchAccessGuard.assertAccess(branchId);
     return parkedOrderRepository.findByBranchIdOrderByParkedAtDesc(branchId).stream()
         .map(parkedOrderMapper::toResponse)
         .toList();
@@ -62,6 +68,7 @@ public class ParkedOrderService {
         parkedOrderRepository
             .findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay don treo"));
+    branchAccessGuard.assertAccess(parkedOrder.getBranch().getId());
     ParkedOrderResponse response = parkedOrderMapper.toResponse(parkedOrder);
     parkedOrderRepository.delete(parkedOrder);
     return response;

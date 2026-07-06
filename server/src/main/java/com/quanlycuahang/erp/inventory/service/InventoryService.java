@@ -1,5 +1,6 @@
 package com.quanlycuahang.erp.inventory.service;
 
+import com.quanlycuahang.erp.auth.security.BranchAccessGuard;
 import com.quanlycuahang.erp.common.dto.ApiResponse;
 import com.quanlycuahang.erp.inventory.dto.InventoryResponse;
 import com.quanlycuahang.erp.inventory.dto.InventoryTransactionResponse;
@@ -29,20 +30,24 @@ public class InventoryService {
   private final InventoryTransactionRepository inventoryTransactionRepository;
   private final InventoryBatchRepository inventoryBatchRepository;
   private final InventoryMapper inventoryMapper;
+  private final BranchAccessGuard branchAccessGuard;
 
   public InventoryService(
       InventoryRepository inventoryRepository,
       InventoryTransactionRepository inventoryTransactionRepository,
       InventoryBatchRepository inventoryBatchRepository,
-      InventoryMapper inventoryMapper) {
+      InventoryMapper inventoryMapper,
+      BranchAccessGuard branchAccessGuard) {
     this.inventoryRepository = inventoryRepository;
     this.inventoryTransactionRepository = inventoryTransactionRepository;
     this.inventoryBatchRepository = inventoryBatchRepository;
     this.inventoryMapper = inventoryMapper;
+    this.branchAccessGuard = branchAccessGuard;
   }
 
   @Transactional(readOnly = true)
   public ApiResponse<List<InventoryResponse>> listByBranch(Long branchId, Pageable pageable) {
+    branchAccessGuard.assertAccess(branchId);
     Page<Inventory> page = inventoryRepository.findByBranchId(branchId, pageable);
     ApiResponse<List<InventoryResponse>> response =
         ApiResponse.page(page.map(inventoryMapper::toResponse));
@@ -52,6 +57,7 @@ public class InventoryService {
 
   @Transactional(readOnly = true)
   public ApiResponse<List<InventoryResponse>> lowStockByBranch(Long branchId, Pageable pageable) {
+    branchAccessGuard.assertAccess(branchId);
     Page<Inventory> page = inventoryRepository.findLowStockByBranchId(branchId, pageable);
     ApiResponse<List<InventoryResponse>> response =
         ApiResponse.page(page.map(inventoryMapper::toResponse));
@@ -87,11 +93,18 @@ public class InventoryService {
     return ((java.sql.Date) value).toLocalDate();
   }
 
+  /**
+   * The kho theo san pham + chi nhanh (FH-7). branchId bat buoc (khong con lay xuyen suot moi chi
+   * nhanh nhu truoc) — phat hien khi rieng soat: endpoint cu khong loc theo chi nhanh, lo ca so
+   * luong lan gia von (unitCost) cua chi nhanh khac ma nguoi dung khong duoc gan.
+   */
   @Transactional(readOnly = true)
   public ApiResponse<List<InventoryTransactionResponse>> transactionHistory(
-      Long productId, Pageable pageable) {
+      Long productId, Long branchId, Pageable pageable) {
+    branchAccessGuard.assertAccess(branchId);
     Page<InventoryTransaction> page =
-        inventoryTransactionRepository.findByProductIdOrderByCreatedAtDesc(productId, pageable);
+        inventoryTransactionRepository.findByProductIdAndBranchIdOrderByCreatedAtDesc(
+            productId, branchId, pageable);
     return ApiResponse.page(page.map(inventoryMapper::toTransactionResponse));
   }
 }

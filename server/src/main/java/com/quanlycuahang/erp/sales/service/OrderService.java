@@ -1,5 +1,6 @@
 package com.quanlycuahang.erp.sales.service;
 
+import com.quanlycuahang.erp.auth.security.BranchAccessGuard;
 import com.quanlycuahang.erp.auth.security.CurrentUserProvider;
 import com.quanlycuahang.erp.common.dto.ApiResponse;
 import com.quanlycuahang.erp.common.exception.BusinessRuleException;
@@ -51,7 +52,6 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -87,6 +87,7 @@ public class OrderService {
   private final IdempotencyService idempotencyService;
   private final NumberSequenceService numberSequenceService;
   private final ApplicationEventPublisher eventPublisher;
+  private final BranchAccessGuard branchAccessGuard;
 
   public OrderService(
       OrderRepository orderRepository,
@@ -106,7 +107,8 @@ public class OrderService {
       CurrentUserProvider currentUserProvider,
       IdempotencyService idempotencyService,
       NumberSequenceService numberSequenceService,
-      ApplicationEventPublisher eventPublisher) {
+      ApplicationEventPublisher eventPublisher,
+      BranchAccessGuard branchAccessGuard) {
     this.orderRepository = orderRepository;
     this.orderItemRepository = orderItemRepository;
     this.orderPaymentRepository = orderPaymentRepository;
@@ -125,10 +127,12 @@ public class OrderService {
     this.idempotencyService = idempotencyService;
     this.numberSequenceService = numberSequenceService;
     this.eventPublisher = eventPublisher;
+    this.branchAccessGuard = branchAccessGuard;
   }
 
   @Transactional
   public OrderResponse createOrder(OrderCreateRequest request, String idempotencyKey) {
+    branchAccessGuard.assertAccess(request.getBranchId());
     Branch branch =
         branchRepository
             .findById(request.getBranchId())
@@ -150,11 +154,8 @@ public class OrderService {
               .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay ca lam viec"));
     }
 
-    // Nap Product + Inventory hien tai — Backend la nguon gia/VAT/gia von duy nhat, khong tin FE.
-    Map<Long, Product> productsById = new HashMap<>();
-    Map<Long, Inventory> inventoriesByProductId = new HashMap<>();
-    List<OrderLineInput> pricingLines = new java.util.ArrayList<>();
-
+    // Nap Product + Inventory hien tai theo lo (khong query rieng tung dong — tranh N+1 khi don
+    // co nhieu dong) — Backend la nguon gia/VAT/gia von duy nhat, khong tin FE.
     boolean priceIncludesVat =
         settingsService.getBoolean(
             branch.getId(), SettingsService.KEY_PRICE_INCLUDES_VAT_DEFAULT, true);
@@ -164,19 +165,30 @@ public class OrderService {
         settingsService.getBigDecimal(
             branch.getId(), SettingsService.KEY_ROUNDING_UNIT, BigDecimal.valueOf(1000));
 
+    List<Long> requestedProductIds =
+        request.getLines().stream().map(OrderLineRequest::getProductId).distinct().toList();
+    Map<Long, Product> productsById =
+        productRepository.findAllById(requestedProductIds).stream()
+            .collect(java.util.stream.Collectors.toMap(Product::getId, p -> p));
+    Map<Long, Inventory> inventoriesByProductId =
+        inventoryRepository
+            .findByBranchIdAndProductIdIn(branch.getId(), requestedProductIds)
+            .stream()
+            .collect(
+                java.util.stream.Collectors.toMap(inv -> inv.getProduct().getId(), inv -> inv));
+
+    List<OrderLineInput> pricingLines = new java.util.ArrayList<>();
     for (OrderLineRequest lineRequest : request.getLines()) {
-      Product product =
-          productRepository
-              .findById(lineRequest.getProductId())
-              .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay san pham"));
-      Inventory inventory =
-          inventoryRepository
-              .findByProductIdAndBranchId(product.getId(), branch.getId())
-              .orElseThrow(
-                  () ->
-                      new BusinessRuleException(
-                          "PRODUCT_OUT_OF_STOCK",
-                          "San pham " + product.getName() + " chua co ton kho tai chi nhanh nay"));
+      Product product = productsById.get(lineRequest.getProductId());
+      if (product == null) {
+        throw new ResourceNotFoundException("Khong tim thay san pham");
+      }
+      Inventory inventory = inventoriesByProductId.get(product.getId());
+      if (inventory == null) {
+        throw new BusinessRuleException(
+            "PRODUCT_OUT_OF_STOCK",
+            "San pham " + product.getName() + " chua co ton kho tai chi nhanh nay");
+      }
 
       if (!allowNegativeStock && inventory.getStock().compareTo(lineRequest.getQuantity()) < 0) {
         throw new BusinessRuleException(
@@ -184,8 +196,6 @@ public class OrderService {
             "San pham " + product.getName() + " chi con " + inventory.getStock() + " trong kho");
       }
 
-      productsById.put(product.getId(), product);
-      inventoriesByProductId.put(product.getId(), inventory);
       pricingLines.add(
           new OrderLineInput(
               product.getId(),
@@ -208,6 +218,17 @@ public class OrderService {
           voucherService.validate(request.getVoucherCode(), roughSubtotal);
       voucher = validation.voucher();
       voucherAmount = validation.discountAmount();
+    }
+
+    // Chan tong CK don + voucher vuot subtotal — OrderPricingService la ham thuan, khong tu
+    // validate (xem
+    // OrderPricingServiceTest#orderDiscountExceedingLineSubtotalProducesNegativeLineTotal),
+    // neu khong chan o day don co the co tong tien am, sai lech bao cao doanh thu/loi nhuan gop.
+    BigDecimal orderLevelReduction = request.getOrderDiscountAmount().add(voucherAmount);
+    if (orderLevelReduction.compareTo(roughSubtotal) > 0) {
+      throw new BusinessRuleException(
+          "ORDER_DISCOUNT_EXCEEDS_SUBTOTAL",
+          "Tong chiet khau (don hang + voucher) khong duoc vuot qua gia tri don hang");
     }
 
     OrderPricingRequest pricingRequest =
@@ -381,6 +402,7 @@ public class OrderService {
         orderRepository
             .findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay don hang"));
+    branchAccessGuard.assertAccess(order.getBranch().getId());
     return toResponse(order);
   }
 
@@ -398,6 +420,7 @@ public class OrderService {
       Long cashierId,
       String search,
       Pageable pageable) {
+    branchAccessGuard.assertAccess(branchId);
     OffsetDateTime fromDateTime =
         from == null ? null : from.atStartOfDay(APP_ZONE).toOffsetDateTime();
     OffsetDateTime toDateTime =
@@ -463,6 +486,7 @@ public class OrderService {
         orderRepository
             .findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay don hang"));
+    branchAccessGuard.assertAccess(order.getBranch().getId());
     OrderStatus current = OrderStatus.fromValue(order.getStatus());
     if (!OrderStatus.canTransition(current, OrderStatus.CANCELLED)) {
       throw new BusinessRuleException(
@@ -502,7 +526,19 @@ public class OrderService {
       inventoryTransactionRepository.save(transaction);
     }
 
-    for (Debt debt : debtRepository.findByReferenceTypeAndReferenceId("order", order.getId())) {
+    List<Debt> orderDebts =
+        debtRepository.findByReferenceTypeAndReferenceId("order", order.getId());
+    // Neu cong no da bi thu 1 phan (amount != originalAmount), khong duoc am tham xoa dau vet so
+    // tien da thu bang cach zero thang — bat huy don, de nguoi dung xu ly cong no truoc (vd hoan
+    // tien) roi moi huy.
+    boolean hasPartialPayment =
+        orderDebts.stream().anyMatch(d -> d.getAmount().compareTo(d.getOriginalAmount()) != 0);
+    if (hasPartialPayment) {
+      throw new BusinessRuleException(
+          "ORDER_CANCEL_DEBT_ALREADY_PAID",
+          "Khong the huy don vi cong no lien quan da duoc thu mot phan, vui long xu ly cong no truoc");
+    }
+    for (Debt debt : orderDebts) {
       debt.setAmount(BigDecimal.ZERO);
       debtRepository.save(debt);
     }

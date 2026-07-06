@@ -48,10 +48,11 @@ export async function listLowStock(
 
 export async function getInventoryTransactions(
   productId: number,
+  branchId: number,
 ): Promise<InventoryTransaction[]> {
   const response = await apiClient.get<ApiSuccess<InventoryTransaction[]>>(
     `/inventory/products/${productId}/transactions`,
-    { params: { size: 30 } },
+    { params: { branchId, size: 30 } },
   );
   return response.data.data;
 }

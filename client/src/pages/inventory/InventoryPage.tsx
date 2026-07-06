@@ -80,8 +80,8 @@ export function InventoryPage() {
   });
 
   const transactionsQuery = useQuery({
-    queryKey: ["inventory", "transactions", selectedProduct?.productId],
-    queryFn: () => getInventoryTransactions(selectedProduct!.productId),
+    queryKey: ["inventory", "transactions", selectedProduct?.productId, CURRENT_BRANCH_ID],
+    queryFn: () => getInventoryTransactions(selectedProduct!.productId, CURRENT_BRANCH_ID),
     enabled: !!selectedProduct,
   });
 

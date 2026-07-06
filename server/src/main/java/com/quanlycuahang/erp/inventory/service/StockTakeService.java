@@ -1,5 +1,6 @@
 package com.quanlycuahang.erp.inventory.service;
 
+import com.quanlycuahang.erp.auth.security.BranchAccessGuard;
 import com.quanlycuahang.erp.auth.security.CurrentUserProvider;
 import com.quanlycuahang.erp.common.exception.BusinessRuleException;
 import com.quanlycuahang.erp.common.exception.ResourceNotFoundException;
@@ -42,6 +43,7 @@ public class StockTakeService {
   private final BranchRepository branchRepository;
   private final StockTakeMapper stockTakeMapper;
   private final CurrentUserProvider currentUserProvider;
+  private final BranchAccessGuard branchAccessGuard;
 
   public StockTakeService(
       StockTakeRepository stockTakeRepository,
@@ -50,7 +52,8 @@ public class StockTakeService {
       InventoryTransactionRepository inventoryTransactionRepository,
       BranchRepository branchRepository,
       StockTakeMapper stockTakeMapper,
-      CurrentUserProvider currentUserProvider) {
+      CurrentUserProvider currentUserProvider,
+      BranchAccessGuard branchAccessGuard) {
     this.stockTakeRepository = stockTakeRepository;
     this.stockTakeItemRepository = stockTakeItemRepository;
     this.inventoryRepository = inventoryRepository;
@@ -58,10 +61,12 @@ public class StockTakeService {
     this.branchRepository = branchRepository;
     this.stockTakeMapper = stockTakeMapper;
     this.currentUserProvider = currentUserProvider;
+    this.branchAccessGuard = branchAccessGuard;
   }
 
   @Transactional
   public StockTakeResponse create(StockTakeCreateRequest request) {
+    branchAccessGuard.assertAccess(request.getBranchId());
     Branch branch =
         branchRepository
             .findById(request.getBranchId())
@@ -161,6 +166,7 @@ public class StockTakeService {
         stockTakeRepository
             .findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay phieu kiem ke"));
+    branchAccessGuard.assertAccess(stockTake.getBranch().getId());
     StockTakeResponse response = stockTakeMapper.toResponse(stockTake);
     response.setItems(
         stockTakeItemRepository.findByStockTakeId(id).stream()
@@ -172,6 +178,7 @@ public class StockTakeService {
   @Transactional(readOnly = true)
   public com.quanlycuahang.erp.common.dto.ApiResponse<List<StockTakeResponse>> list(
       Long branchId, Pageable pageable) {
+    branchAccessGuard.assertAccess(branchId);
     Page<StockTake> page =
         stockTakeRepository.findByBranchIdOrderByCreatedAtDesc(branchId, pageable);
     return com.quanlycuahang.erp.common.dto.ApiResponse.page(page.map(stockTakeMapper::toResponse));
@@ -182,6 +189,7 @@ public class StockTakeService {
         stockTakeRepository
             .findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay phieu kiem ke"));
+    branchAccessGuard.assertAccess(stockTake.getBranch().getId());
     if (!"draft".equals(stockTake.getStatus())) {
       throw new BusinessRuleException("STOCK_TAKE_ALREADY_APPROVED", "Phieu kiem ke da duoc duyet");
     }

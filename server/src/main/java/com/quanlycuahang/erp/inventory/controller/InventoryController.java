@@ -41,7 +41,7 @@ public class InventoryController {
   @GetMapping("/products/{productId}/transactions")
   @PreAuthorize("hasAuthority('inventory:view')")
   public ResponseEntity<ApiResponse<List<InventoryTransactionResponse>>> transactionHistory(
-      @PathVariable Long productId, Pageable pageable) {
-    return ResponseEntity.ok(inventoryService.transactionHistory(productId, pageable));
+      @PathVariable Long productId, @RequestParam Long branchId, Pageable pageable) {
+    return ResponseEntity.ok(inventoryService.transactionHistory(productId, branchId, pageable));
   }
 }

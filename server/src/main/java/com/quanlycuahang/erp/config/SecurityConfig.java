@@ -4,6 +4,7 @@ import com.quanlycuahang.erp.auth.security.JwtAccessDeniedHandler;
 import com.quanlycuahang.erp.auth.security.JwtAuthenticationEntryPoint;
 import com.quanlycuahang.erp.auth.security.JwtAuthenticationFilter;
 import com.quanlycuahang.erp.auth.security.ResourceActionPermissionEvaluator;
+import com.quanlycuahang.erp.common.web.ApiRateLimitFilter;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -36,14 +37,17 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
   private final JwtAuthenticationFilter jwtAuthenticationFilter;
+  private final ApiRateLimitFilter apiRateLimitFilter;
   private final JwtAuthenticationEntryPoint authenticationEntryPoint;
   private final JwtAccessDeniedHandler accessDeniedHandler;
 
   public SecurityConfig(
       JwtAuthenticationFilter jwtAuthenticationFilter,
+      ApiRateLimitFilter apiRateLimitFilter,
       JwtAuthenticationEntryPoint authenticationEntryPoint,
       JwtAccessDeniedHandler accessDeniedHandler) {
     this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+    this.apiRateLimitFilter = apiRateLimitFilter;
     this.authenticationEntryPoint = authenticationEntryPoint;
     this.accessDeniedHandler = accessDeniedHandler;
   }
@@ -74,7 +78,8 @@ public class SecurityConfig {
             eh ->
                 eh.authenticationEntryPoint(authenticationEntryPoint)
                     .accessDeniedHandler(accessDeniedHandler))
-        .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+        .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+        .addFilterAfter(apiRateLimitFilter, JwtAuthenticationFilter.class);
     return http.build();
   }
 
