@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Playwright E2E (Phase 11)
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
