@@ -26,10 +26,10 @@ public interface OrderRepository
 
   /**
    * Doanh thu nhom theo ngay/tuan/thang (:unit = 'day'|'week'|'month') — quy ve gio dia phuong
-   * Asia/Ho_Chi_Minh truoc khi cat, tranh lech ngay so voi UTC luu trong DB (Phase 10). Kem gia
-   * von (cost_of_goods_sold) tinh rieng qua subquery tren order_items roi LEFT JOIN theo label,
-   * tranh nhan doi revenue neu JOIN truc tiep order_items (1 don co nhieu dong) — dung ve doi
-   * thi ban FE thanh chart 2 chuoi Doanh thu/Loi nhuan gop (FH-15).
+   * Asia/Ho_Chi_Minh truoc khi cat, tranh lech ngay so voi UTC luu trong DB (Phase 10). Kem gia von
+   * (cost_of_goods_sold) tinh rieng qua subquery tren order_items roi LEFT JOIN theo label, tranh
+   * nhan doi revenue neu JOIN truc tiep order_items (1 don co nhieu dong) — dung ve doi thi ban FE
+   * thanh chart 2 chuoi Doanh thu/Loi nhuan gop (FH-15).
    */
   @Query(
       value =
@@ -37,13 +37,17 @@ public interface OrderRepository
               + "FROM ("
               + "  SELECT to_char(date_trunc(:unit, o.created_at AT TIME ZONE 'Asia/Ho_Chi_Minh'), 'YYYY-MM-DD') AS label, "
               + "  COALESCE(SUM(o.total_amount), 0) AS revenue, COUNT(*) AS order_count "
-              + "  FROM orders o WHERE o.status IN " + REVENUE_STATUSES + " "
+              + "  FROM orders o WHERE o.status IN "
+              + REVENUE_STATUSES
+              + " "
               + "  AND o.created_at >= :from AND o.created_at < :to "
               + "  AND (:branchId IS NULL OR o.branch_id = :branchId) GROUP BY 1"
               + ") r LEFT JOIN ("
               + "  SELECT to_char(date_trunc(:unit, o.created_at AT TIME ZONE 'Asia/Ho_Chi_Minh'), 'YYYY-MM-DD') AS label, "
               + "  COALESCE(SUM(oi.cost_price_snapshot * oi.quantity), 0) AS cost_of_goods_sold "
-              + "  FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE o.status IN " + REVENUE_STATUSES + " "
+              + "  FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE o.status IN "
+              + REVENUE_STATUSES
+              + " "
               + "  AND o.created_at >= :from AND o.created_at < :to "
               + "  AND (:branchId IS NULL OR o.branch_id = :branchId) GROUP BY 1"
               + ") c ON c.label = r.label "
@@ -60,11 +64,15 @@ public interface OrderRepository
           "SELECT r.label, r.revenue, r.order_count, COALESCE(c.cost_of_goods_sold, 0) "
               + "FROM ("
               + "  SELECT b.id AS branch_id, b.name AS label, COALESCE(SUM(o.total_amount), 0) AS revenue, COUNT(*) AS order_count "
-              + "  FROM orders o JOIN branches b ON b.id = o.branch_id WHERE o.status IN " + REVENUE_STATUSES + " "
+              + "  FROM orders o JOIN branches b ON b.id = o.branch_id WHERE o.status IN "
+              + REVENUE_STATUSES
+              + " "
               + "  AND o.created_at >= :from AND o.created_at < :to GROUP BY b.id, b.name"
               + ") r LEFT JOIN ("
               + "  SELECT o.branch_id, COALESCE(SUM(oi.cost_price_snapshot * oi.quantity), 0) AS cost_of_goods_sold "
-              + "  FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE o.status IN " + REVENUE_STATUSES + " "
+              + "  FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE o.status IN "
+              + REVENUE_STATUSES
+              + " "
               + "  AND o.created_at >= :from AND o.created_at < :to GROUP BY o.branch_id"
               + ") c ON c.branch_id = r.branch_id "
               + "ORDER BY r.revenue DESC",
@@ -77,12 +85,16 @@ public interface OrderRepository
           "SELECT r.label, r.revenue, r.order_count, COALESCE(c.cost_of_goods_sold, 0) "
               + "FROM ("
               + "  SELECT u.id AS cashier_id, u.full_name AS label, COALESCE(SUM(o.total_amount), 0) AS revenue, COUNT(*) AS order_count "
-              + "  FROM orders o JOIN users u ON u.id = o.cashier_id WHERE o.status IN " + REVENUE_STATUSES + " "
+              + "  FROM orders o JOIN users u ON u.id = o.cashier_id WHERE o.status IN "
+              + REVENUE_STATUSES
+              + " "
               + "  AND o.created_at >= :from AND o.created_at < :to "
               + "  AND (:branchId IS NULL OR o.branch_id = :branchId) GROUP BY u.id, u.full_name"
               + ") r LEFT JOIN ("
               + "  SELECT o.cashier_id, COALESCE(SUM(oi.cost_price_snapshot * oi.quantity), 0) AS cost_of_goods_sold "
-              + "  FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE o.status IN " + REVENUE_STATUSES + " "
+              + "  FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE o.status IN "
+              + REVENUE_STATUSES
+              + " "
               + "  AND o.created_at >= :from AND o.created_at < :to "
               + "  AND (:branchId IS NULL OR o.branch_id = :branchId) GROUP BY o.cashier_id"
               + ") c ON c.cashier_id = r.cashier_id "
@@ -128,8 +140,8 @@ public interface OrderRepository
   /**
    * Danh sach don gan day nhat cho Dashboard — co danh dau has_debt (EXISTS truc tiep tren
    * debts.reference_type='order') vi trang thai "Ghi nợ" khong phai 1 gia tri cua orders.status
-   * (state machine chi co draft/completed/partially_returned/fully_returned/cancelled) ma la
-   * cong no con treo phat sinh khi ban chua thu du tien (OrderService.createOrder).
+   * (state machine chi co draft/completed/partially_returned/fully_returned/cancelled) ma la cong
+   * no con treo phat sinh khi ban chua thu du tien (OrderService.createOrder).
    */
   @Query(
       value =
@@ -142,8 +154,10 @@ public interface OrderRepository
       nativeQuery = true)
   List<Object[]> findRecentOrders(@Param("branchId") Long branchId, @Param("limit") int limit);
 
-  /** Danh sach don hang co loc, dung cho trang Don hang (FH-9). payment_methods gop cac phuong
-   * thuc thanh toan da ghi nhan (co the rong neu don ghi no hoan toan chua thu dong nao). */
+  /**
+   * Danh sach don hang co loc, dung cho trang Don hang (FH-9). payment_methods gop cac phuong thuc
+   * thanh toan da ghi nhan (co the rong neu don ghi no hoan toan chua thu dong nao).
+   */
   @Query(
       value =
           "SELECT o.id, o.order_number, o.created_at, o.status, o.total_amount, "

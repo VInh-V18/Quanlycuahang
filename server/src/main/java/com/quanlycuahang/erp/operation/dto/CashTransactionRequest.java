@@ -9,9 +9,7 @@ public class CashTransactionRequest {
 
   @NotBlank private String type;
 
-  @NotNull
-  @Positive
-  private BigDecimal amount;
+  @NotNull @Positive private BigDecimal amount;
 
   private String note;
 

@@ -15,10 +15,10 @@ import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.Where;
 
 /**
- * Lo hang + HSD ghi nhan tai thoi diem nhap kho (FH-4). Day la thong tin THAM KHAO cho canh bao
- * can het han va hien thi "Lo gan nhat/HSD" o Ton kho — khong phai nguon su that cho ton kho hien
- * tai (inventory.stock van la nguon duy nhat, giu nguyen tinh binh quan gia quyen D5/B4); quantity
- * o day la SL nhap luc do, khong bi tru khi ban/kiem ke.
+ * Lo hang + HSD ghi nhan tai thoi diem nhap kho (FH-4). Day la thong tin THAM KHAO cho canh bao can
+ * het han va hien thi "Lo gan nhat/HSD" o Ton kho — khong phai nguon su that cho ton kho hien tai
+ * (inventory.stock van la nguon duy nhat, giu nguyen tinh binh quan gia quyen D5/B4); quantity o
+ * day la SL nhap luc do, khong bi tru khi ban/kiem ke.
  */
 @Entity
 @Table(name = "inventory_batches")

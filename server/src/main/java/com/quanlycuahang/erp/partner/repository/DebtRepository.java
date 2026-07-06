@@ -50,8 +50,8 @@ public interface DebtRepository extends JpaRepository<Debt, Long> {
   List<Object[]> summaryByDirection(@Param("direction") String direction);
 
   /**
-   * Tuoi no theo tung doi tac (khac voi findAgingBuckets() o tren la tong hop toan he thong,
-   * Phase 10 report) — 3 muc dung mockup FruitHouse: 0-7/8-30/>30 ngay (FH-12).
+   * Tuoi no theo tung doi tac (khac voi findAgingBuckets() o tren la tong hop toan he thong, Phase
+   * 10 report) — 3 muc dung mockup FruitHouse: 0-7/8-30/>30 ngay (FH-12).
    */
   @Query(
       value =
@@ -78,11 +78,11 @@ public interface DebtRepository extends JpaRepository<Debt, Long> {
       Long supplierId, String direction, java.math.BigDecimal minAmount);
 
   /**
-   * Lich su doi chieu 1 doi tac: hop nhat 2 nguon — luc phat sinh no (debts.original_amount,
-   * duong) va luc thu/tra no (debt_payments.amount, am). KHONG bao gom truong hop tra hang lam
-   * giam no truc tiep tren debts.amount (ReturnService) vi luc do KHONG ghi lai 1 dong lich su
-   * rieng — no ton tai tu Phase 9/FH-9, ngoai pham vi FH-12 (chi xay Cong no chi tiet + Ghi nhan
-   * thanh toan, chua sua lai ReturnService).
+   * Lich su doi chieu 1 doi tac: hop nhat 2 nguon — luc phat sinh no (debts.original_amount, duong)
+   * va luc thu/tra no (debt_payments.amount, am). KHONG bao gom truong hop tra hang lam giam no
+   * truc tiep tren debts.amount (ReturnService) vi luc do KHONG ghi lai 1 dong lich su rieng — no
+   * ton tai tu Phase 9/FH-9, ngoai pham vi FH-12 (chi xay Cong no chi tiet + Ghi nhan thanh toan,
+   * chua sua lai ReturnService).
    */
   @Query(
       value =

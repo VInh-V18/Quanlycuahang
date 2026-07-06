@@ -44,7 +44,8 @@ public class InventoryService {
   @Transactional(readOnly = true)
   public ApiResponse<List<InventoryResponse>> listByBranch(Long branchId, Pageable pageable) {
     Page<Inventory> page = inventoryRepository.findByBranchId(branchId, pageable);
-    ApiResponse<List<InventoryResponse>> response = ApiResponse.page(page.map(inventoryMapper::toResponse));
+    ApiResponse<List<InventoryResponse>> response =
+        ApiResponse.page(page.map(inventoryMapper::toResponse));
     enrichWithNearestBatch(response.getData(), branchId);
     return response;
   }
@@ -52,7 +53,8 @@ public class InventoryService {
   @Transactional(readOnly = true)
   public ApiResponse<List<InventoryResponse>> lowStockByBranch(Long branchId, Pageable pageable) {
     Page<Inventory> page = inventoryRepository.findLowStockByBranchId(branchId, pageable);
-    ApiResponse<List<InventoryResponse>> response = ApiResponse.page(page.map(inventoryMapper::toResponse));
+    ApiResponse<List<InventoryResponse>> response =
+        ApiResponse.page(page.map(inventoryMapper::toResponse));
     enrichWithNearestBatch(response.getData(), branchId);
     return response;
   }

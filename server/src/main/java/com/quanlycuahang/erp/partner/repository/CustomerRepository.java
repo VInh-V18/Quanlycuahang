@@ -23,8 +23,10 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
       nativeQuery = true)
   Page<Customer> search(@Param("search") String search, Pageable pageable);
 
-  /** Danh sach khach hang kem thong ke mua hang + cong no con du (FH-11) — dung cho trang Khach
-   * hang (khac voi search() o tren, chi tra Customer tho dung cho POS quick-search). */
+  /**
+   * Danh sach khach hang kem thong ke mua hang + cong no con du (FH-11) — dung cho trang Khach hang
+   * (khac voi search() o tren, chi tra Customer tho dung cho POS quick-search).
+   */
   @Query(
       value =
           "SELECT * FROM ("
@@ -37,7 +39,8 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
               + "FROM customers c "
               + "LEFT JOIN customer_groups cg ON cg.id = c.customer_group_id "
               + "LEFT JOIN orders o ON o.customer_id = c.id AND o.deleted_at IS NULL "
-              + "AND o.status IN " + "('completed','partially_returned','fully_returned') "
+              + "AND o.status IN "
+              + "('completed','partially_returned','fully_returned') "
               + "WHERE c.deleted_at IS NULL "
               + "AND (:search = '' OR immutable_unaccent(lower(c.name)) ILIKE '%' || immutable_unaccent(lower(:search)) || '%' "
               + "     OR c.phone ILIKE '%' || :search || '%') "

@@ -7,16 +7,15 @@ import org.springframework.stereotype.Service;
 
 /**
  * Luu tokenFamily -> jti hop le hien tai trong Redis (D3 rotation + reuse detection). Moi
- * tokenFamily chi co dung 1 jti hop le tai 1 thoi diem — refresh bang jti khac (da bi rotate qua
- * VA da het han grace, xem duoi) nghia la token cu bi danh cap hoac dung lai, phai thu hoi ca
- * chuoi.
+ * tokenFamily chi co dung 1 jti hop le tai 1 thoi diem — refresh bang jti khac (da bi rotate qua VA
+ * da het han grace, xem duoi) nghia la token cu bi danh cap hoac dung lai, phai thu hoi ca chuoi.
  *
  * <p>Moi jti vua bi rotate qua duoc ghi lai rieng le (khoa "retired:{jti}", TTL = GRACE_PERIOD)
- * thay vi 1 o nho duy nhat co the bi ghi de — vi thuc te co the co NHIEU hon 2 request refresh
- * gan nhu dong thoi cung dung 1 token con hop le (React StrictMode goi bootstrapSession 2 lan luc
- * dev, cong them 1 request khac dang cho 401 tu truoc do cung kich hoat refresh) — neu chi giu 1
- * jti "grace" duy nhat, rotation thu 3 se ghi de mat dau vet cua jti dau tien va van bi bao nham
- * la reuse. Dung 1 khoa rieng/jti tranh hoan toan gioi han so luong nguoi tham gia cuoc dua.
+ * thay vi 1 o nho duy nhat co the bi ghi de — vi thuc te co the co NHIEU hon 2 request refresh gan
+ * nhu dong thoi cung dung 1 token con hop le (React StrictMode goi bootstrapSession 2 lan luc dev,
+ * cong them 1 request khac dang cho 401 tu truoc do cung kich hoat refresh) — neu chi giu 1 jti
+ * "grace" duy nhat, rotation thu 3 se ghi de mat dau vet cua jti dau tien va van bi bao nham la
+ * reuse. Dung 1 khoa rieng/jti tranh hoan toan gioi han so luong nguoi tham gia cuoc dua.
  */
 @Service
 public class RefreshTokenService {

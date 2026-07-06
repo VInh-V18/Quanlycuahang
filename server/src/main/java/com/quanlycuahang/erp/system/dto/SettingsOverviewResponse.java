@@ -4,8 +4,8 @@ import java.util.Map;
 
 /**
  * settings: cau hinh co the sua qua PUT /settings. systemInfo: thong tin he thong CHI DOC (vd TTL
- * JWT doc tu application.yml) — hien thi de tham khao trong tab Bao mat & he thong nhung khong
- * gui len PUT vi doi can sua config + restart, khong phai settings dong (FH-16).
+ * JWT doc tu application.yml) — hien thi de tham khao trong tab Bao mat & he thong nhung khong gui
+ * len PUT vi doi can sua config + restart, khong phai settings dong (FH-16).
  */
 public class SettingsOverviewResponse {
 

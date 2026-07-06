@@ -23,9 +23,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Tong hop so lieu cho trang Tong quan (FH-3) — tai su dung ReportService cho doanh thu/lai
- * gop/top san pham (cung 1 cong thuc voi module Bao cao, Phase 10), chi them truy van rieng cho
- * don gan day + so don tra hang trong ngay (chua co o ReportService).
+ * Tong hop so lieu cho trang Tong quan (FH-3) — tai su dung ReportService cho doanh thu/lai gop/top
+ * san pham (cung 1 cong thuc voi module Bao cao, Phase 10), chi them truy van rieng cho don gan day
+ * + so don tra hang trong ngay (chua co o ReportService).
  */
 @Service
 public class DashboardService {
@@ -103,7 +103,8 @@ public class DashboardService {
     response.setOrderCountDelta(todayOrderCount - yesterdayOrderCount);
     response.setAverageOrderValue(averageOf(todayRevenue, todayOrderCount));
     response.setGrossProfitToday(grossProfit.getGrossProfit());
-    response.setGrossProfitMarginPercent(percentOfRevenue(grossProfit.getGrossProfit(), todayRevenue));
+    response.setGrossProfitMarginPercent(
+        percentOfRevenue(grossProfit.getGrossProfit(), todayRevenue));
     response.setReturnCountToday(returnCountToday);
     response.setRefundAmountToday(refundAmountToday);
     response.setLast7Days(last7Days);
@@ -134,12 +135,14 @@ public class DashboardService {
       filled.add(
           existing != null
               ? existing
-              : new RevenueBucketResponse(date.format(LABEL_FORMAT), BigDecimal.ZERO, 0, BigDecimal.ZERO));
+              : new RevenueBucketResponse(
+                  date.format(LABEL_FORMAT), BigDecimal.ZERO, 0, BigDecimal.ZERO));
     }
     return filled;
   }
 
-  private static RevenueBucketResponse findByLabel(List<RevenueBucketResponse> buckets, LocalDate date) {
+  private static RevenueBucketResponse findByLabel(
+      List<RevenueBucketResponse> buckets, LocalDate date) {
     String label = date.format(LABEL_FORMAT);
     return buckets.stream().filter(b -> label.equals(b.getLabel())).findFirst().orElse(null);
   }

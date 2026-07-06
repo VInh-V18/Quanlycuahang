@@ -29,7 +29,8 @@ public class BranchController {
   @GetMapping
   @PreAuthorize("hasAuthority('branch:view')")
   public ResponseEntity<ApiResponse<List<BranchResponse>>> list() {
-    List<BranchResponse> branches = branchRepository.findAll().stream().map(BranchController::toResponse).toList();
+    List<BranchResponse> branches =
+        branchRepository.findAll().stream().map(BranchController::toResponse).toList();
     return ResponseEntity.ok(ApiResponse.success(branches));
   }
 

@@ -73,7 +73,14 @@ public class OrderController {
       @RequestParam(required = false, defaultValue = "") String search) {
     List<OrderListItemResponse> data =
         orderService
-            .list(branchId, from, to, status, cashierId, search, org.springframework.data.domain.PageRequest.of(0, 10_000))
+            .list(
+                branchId,
+                from,
+                to,
+                status,
+                cashierId,
+                search,
+                org.springframework.data.domain.PageRequest.of(0, 10_000))
             .getData();
     byte[] file =
         excelExporter.export(

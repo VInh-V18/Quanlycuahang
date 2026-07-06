@@ -18,9 +18,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Cong no chi tiet (FH-12) — khac voi ReportController.debtAging (Phase 10, tong hop toan he
- * thong theo 4 muc 0-30/31-60/61-90/90+); day la theo tung doi tac, 3 muc 0-7/8-30/>30, kem lich
- * su doi chieu + ghi nhan thanh toan. */
+/**
+ * Cong no chi tiet (FH-12) — khac voi ReportController.debtAging (Phase 10, tong hop toan he thong
+ * theo 4 muc 0-30/31-60/61-90/90+); day la theo tung doi tac, 3 muc 0-7/8-30/>30, kem lich su doi
+ * chieu + ghi nhan thanh toan.
+ */
 @RestController
 @RequestMapping("/api/v1/debts")
 public class DebtController {

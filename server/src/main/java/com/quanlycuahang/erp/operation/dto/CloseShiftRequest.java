@@ -6,9 +6,7 @@ import java.math.BigDecimal;
 
 public class CloseShiftRequest {
 
-  @NotNull
-  @PositiveOrZero
-  private BigDecimal actualCash;
+  @NotNull @PositiveOrZero private BigDecimal actualCash;
 
   private String note;
 

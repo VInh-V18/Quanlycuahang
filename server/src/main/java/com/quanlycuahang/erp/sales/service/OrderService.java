@@ -1,6 +1,7 @@
 package com.quanlycuahang.erp.sales.service;
 
 import com.quanlycuahang.erp.auth.security.CurrentUserProvider;
+import com.quanlycuahang.erp.common.dto.ApiResponse;
 import com.quanlycuahang.erp.common.exception.BusinessRuleException;
 import com.quanlycuahang.erp.common.exception.ResourceNotFoundException;
 import com.quanlycuahang.erp.common.sequence.NumberSequenceService;
@@ -23,7 +24,6 @@ import com.quanlycuahang.erp.product.repository.ProductRepository;
 import com.quanlycuahang.erp.promotion.entity.Voucher;
 import com.quanlycuahang.erp.promotion.service.VoucherService;
 import com.quanlycuahang.erp.promotion.service.VoucherValidationResult;
-import com.quanlycuahang.erp.common.dto.ApiResponse;
 import com.quanlycuahang.erp.sales.dto.OrderCreateRequest;
 import com.quanlycuahang.erp.sales.dto.OrderItemResponse;
 import com.quanlycuahang.erp.sales.dto.OrderLineRequest;
@@ -398,8 +398,10 @@ public class OrderService {
       Long cashierId,
       String search,
       Pageable pageable) {
-    OffsetDateTime fromDateTime = from == null ? null : from.atStartOfDay(APP_ZONE).toOffsetDateTime();
-    OffsetDateTime toDateTime = to == null ? null : to.plusDays(1).atStartOfDay(APP_ZONE).toOffsetDateTime();
+    OffsetDateTime fromDateTime =
+        from == null ? null : from.atStartOfDay(APP_ZONE).toOffsetDateTime();
+    OffsetDateTime toDateTime =
+        to == null ? null : to.plusDays(1).atStartOfDay(APP_ZONE).toOffsetDateTime();
     Page<Object[]> page =
         orderRepository.search(
             branchId,

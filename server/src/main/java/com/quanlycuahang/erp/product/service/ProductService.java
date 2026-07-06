@@ -79,7 +79,9 @@ public class ProductService {
     return response;
   }
 
-  /** Gan ton kho + gia von theo chi nhanh vao moi dong san pham (FH-5) — 1 truy van cho ca trang. */
+  /**
+   * Gan ton kho + gia von theo chi nhanh vao moi dong san pham (FH-5) — 1 truy van cho ca trang.
+   */
   private void enrichWithBranchStock(List<ProductResponse> rows, Long branchId) {
     if (rows.isEmpty()) {
       return;

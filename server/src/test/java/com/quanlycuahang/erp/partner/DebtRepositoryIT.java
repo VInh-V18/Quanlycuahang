@@ -22,8 +22,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Integration test Phase 11 Gate: khoa lai bug that tim thay o FH-12 — findAgingByPartner JOIN
- * UNION ALL giua customers/suppliers theo id trung lap giua 2 bang (khach hang #1 va NCC #1 cung
- * co id=1) tung khien ca 2 ten doi tac lan vao chung 1 chieu cong no truoc khi sua bang cot "kind".
+ * UNION ALL giua customers/suppliers theo id trung lap giua 2 bang (khach hang #1 va NCC #1 cung co
+ * id=1) tung khien ca 2 ten doi tac lan vao chung 1 chieu cong no truoc khi sua bang cot "kind".
  * Chay tren PostgreSQL that qua Testcontainers (khong mock) vi loi nay chi lo ra qua JOIN SQL that,
  * unit test JPQL/mock khong the phat hien (dung nhu 2 IT truoc o Phase 3/5 da phat hien bug that
  * qua ha tang that). Ghi chu moi truong: sandbox lam Phase 11 nay KHONG co Docker daemon (da xac

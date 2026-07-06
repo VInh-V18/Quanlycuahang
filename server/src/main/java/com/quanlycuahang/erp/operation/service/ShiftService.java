@@ -102,7 +102,8 @@ public class ShiftService {
   public ShiftDetailResponse close(Long id, CloseShiftRequest request) {
     Shift shift = requireShift(id);
     if (!"open".equals(shift.getStatus())) {
-      throw new BusinessRuleException("SHIFT_ALREADY_CLOSED", "Ca lam viec nay da duoc dong truoc do");
+      throw new BusinessRuleException(
+          "SHIFT_ALREADY_CLOSED", "Ca lam viec nay da duoc dong truoc do");
     }
 
     OffsetDateTime closedAt = OffsetDateTime.now();
@@ -164,10 +165,16 @@ public class ShiftService {
   private BigDecimal computeExpectedCash(Shift shift, OffsetDateTime asOf) {
     BigDecimal cashSales = orderPaymentRepository.sumByShiftIdAndMethod(shift.getId(), "cash");
     BigDecimal cashRefunds =
-        returnRepository.sumCashRefundsInWindow(shift.getBranch().getId(), shift.getOpenedAt(), asOf);
+        returnRepository.sumCashRefundsInWindow(
+            shift.getBranch().getId(), shift.getOpenedAt(), asOf);
     BigDecimal cashIn = cashTransactionRepository.sumByShiftIdAndType(shift.getId(), "cash_in");
     BigDecimal cashOut = cashTransactionRepository.sumByShiftIdAndType(shift.getId(), "cash_out");
-    return shift.getOpeningCash().add(cashSales).subtract(cashRefunds).add(cashIn).subtract(cashOut);
+    return shift
+        .getOpeningCash()
+        .add(cashSales)
+        .subtract(cashRefunds)
+        .add(cashIn)
+        .subtract(cashOut);
   }
 
   private ShiftDetailResponse toDetail(Shift shift) {
@@ -176,10 +183,12 @@ public class ShiftService {
 
     OffsetDateTime asOf = shift.getClosedAt() != null ? shift.getClosedAt() : OffsetDateTime.now();
     BigDecimal cashSales = orderPaymentRepository.sumByShiftIdAndMethod(shift.getId(), "cash");
-    BigDecimal bankSales = orderPaymentRepository.sumByShiftIdAndMethod(shift.getId(), "bank_transfer");
+    BigDecimal bankSales =
+        orderPaymentRepository.sumByShiftIdAndMethod(shift.getId(), "bank_transfer");
     BigDecimal cardSales = orderPaymentRepository.sumByShiftIdAndMethod(shift.getId(), "card");
     BigDecimal cashRefunds =
-        returnRepository.sumCashRefundsInWindow(shift.getBranch().getId(), shift.getOpenedAt(), asOf);
+        returnRepository.sumCashRefundsInWindow(
+            shift.getBranch().getId(), shift.getOpenedAt(), asOf);
     BigDecimal cashIn = cashTransactionRepository.sumByShiftIdAndType(shift.getId(), "cash_in");
     BigDecimal cashOut = cashTransactionRepository.sumByShiftIdAndType(shift.getId(), "cash_out");
 
@@ -189,7 +198,8 @@ public class ShiftService {
     dto.setCashRefundTotal(cashRefunds);
     dto.setCashInTotal(cashIn);
     dto.setCashOutTotal(cashOut);
-    dto.setExpectedCash(shift.getOpeningCash().add(cashSales).subtract(cashRefunds).add(cashIn).subtract(cashOut));
+    dto.setExpectedCash(
+        shift.getOpeningCash().add(cashSales).subtract(cashRefunds).add(cashIn).subtract(cashOut));
     dto.setOrderCount(orderRepository.countByShiftId(shift.getId()));
     dto.setCashTransactions(
         cashTransactionRepository.findByShiftIdOrderByCreatedAtDesc(shift.getId()).stream()

@@ -34,7 +34,8 @@ public class SettingsController {
             "accessTokenTtlMinutes", String.valueOf(jwtService.getAccessTokenTtlMinutes()),
             "refreshTokenTtlDays", String.valueOf(jwtService.getRefreshTokenTtlDays()));
     return ResponseEntity.ok(
-        ApiResponse.success(new SettingsOverviewResponse(settingsService.getAllGlobal(), systemInfo)));
+        ApiResponse.success(
+            new SettingsOverviewResponse(settingsService.getAllGlobal(), systemInfo)));
   }
 
   @PutMapping

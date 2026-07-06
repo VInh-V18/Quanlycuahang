@@ -36,8 +36,10 @@ public class JwtService {
     this.refreshTokenTtlMillis = refreshTokenTtlDays * 24 * 60 * 60_000L;
   }
 
-  /** Hien thi (chi doc) tren trang Cai dat > Bao mat & he thong (FH-16) — doi TTL can sua
-   * application.yml + restart, khong phai settings dong (bang settings) nen khong cho sua qua UI. */
+  /**
+   * Hien thi (chi doc) tren trang Cai dat > Bao mat & he thong (FH-16) — doi TTL can sua
+   * application.yml + restart, khong phai settings dong (bang settings) nen khong cho sua qua UI.
+   */
   public long getAccessTokenTtlMinutes() {
     return accessTokenTtlMillis / 60_000L;
   }

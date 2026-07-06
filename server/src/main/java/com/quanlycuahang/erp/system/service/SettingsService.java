@@ -36,8 +36,10 @@ public class SettingsService {
   public static final String KEY_STORE_ADDRESS = "store_address";
   public static final String KEY_LOGIN_RATE_LIMIT_ATTEMPTS = "login_rate_limit_attempts";
 
-  /** Danh sach khoa duoc phep doc/sua qua trang Cai dat (FH-16) — chan cap nhat khoa la
-   * ngoai danh sach nay de tranh API bi loi dung ghi de gia tri tuy y vao bang settings. */
+  /**
+   * Danh sach khoa duoc phep doc/sua qua trang Cai dat (FH-16) — chan cap nhat khoa la ngoai danh
+   * sach nay de tranh API bi loi dung ghi de gia tri tuy y vao bang settings.
+   */
   private static final List<String> EDITABLE_KEYS =
       List.of(
           KEY_PRICE_INCLUDES_VAT_DEFAULT,

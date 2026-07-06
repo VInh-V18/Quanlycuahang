@@ -7,10 +7,10 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit test thuan JUnit 5, KHONG Spring context (Phase 8/11 Gate): >=20 kich ban kiem tra tung
- * buoc trong 7 buoc B4 rieng le va ket hop, kem phep tinh tay tung dong trong Javadoc tung test.
- * Mot so kich ban (giam gia vuot subtotal, so luong = 0) mo ta hanh vi thuc te cua ham thuan —
- * khong tu clamp/validate, viec kiem tra hop le thuoc ve OrderService/FE goi no.
+ * Unit test thuan JUnit 5, KHONG Spring context (Phase 8/11 Gate): >=20 kich ban kiem tra tung buoc
+ * trong 7 buoc B4 rieng le va ket hop, kem phep tinh tay tung dong trong Javadoc tung test. Mot so
+ * kich ban (giam gia vuot subtotal, so luong = 0) mo ta hanh vi thuc te cua ham thuan — khong tu
+ * clamp/validate, viec kiem tra hop le thuoc ve OrderService/FE goi no.
  */
 class OrderPricingServiceTest {
 
@@ -167,8 +167,10 @@ class OrderPricingServiceTest {
     assertThat(result.getDiscountAmount()).isEqualByComparingTo(bd(100));
   }
 
-  /** Dung so lieu het test tren nhung dung voucher thay CK don — ket qua phai giong het vi
-   * orderLevelReduction = CK don + voucher, khong phan biet nguon. */
+  /**
+   * Dung so lieu het test tren nhung dung voucher thay CK don — ket qua phai giong het vi
+   * orderLevelReduction = CK don + voucher, khong phan biet nguon.
+   */
   @Test
   void voucherAloneBehavesSameAsOrderDiscountInAllocation() {
     List<OrderLineInput> lines =
@@ -185,8 +187,10 @@ class OrderPricingServiceTest {
     assertThat(result.getDiscountAmount()).isEqualByComparingTo(bd(100));
   }
 
-  /** Chi 1 dong -> vong lap phan bo theo ty trong (i < n-1) khong chay, toan bo CK don + voucher
-   * do vao dong duy nhat qua nhanh "du" (residual). */
+  /**
+   * Chi 1 dong -> vong lap phan bo theo ty trong (i < n-1) khong chay, toan bo CK don + voucher do
+   * vao dong duy nhat qua nhanh "du" (residual).
+   */
   @Test
   void combinedOrderDiscountAndVoucherOnSingleLineGoesEntirelyToResidual() {
     List<OrderLineInput> lines =
@@ -200,8 +204,10 @@ class OrderPricingServiceTest {
     assertThat(result.getDiscountAmount()).isEqualByComparingTo(bd(80));
   }
 
-  /** 3 dong VAT khac nhau (0%/5%/10%), gia chua gom VAT -> moi dong tinh doc lap, tong VAT =
-   * 0+50+100=150. */
+  /**
+   * 3 dong VAT khac nhau (0%/5%/10%), gia chua gom VAT -> moi dong tinh doc lap, tong VAT =
+   * 0+50+100=150.
+   */
   @Test
   void mixedVatRatesAcrossLinesSumIndependently() {
     List<OrderLineInput> lines =
@@ -238,7 +244,8 @@ class OrderPricingServiceTest {
   @Test
   void fractionalQuantityRoundsLineAmountHalfUp() {
     List<OrderLineInput> lines =
-        List.of(new OrderLineInput(1L, bd(33_333), bdStr("0.333"), BigDecimal.ZERO, BigDecimal.ZERO));
+        List.of(
+            new OrderLineInput(1L, bd(33_333), bdStr("0.333"), BigDecimal.ZERO, BigDecimal.ZERO));
     OrderPricingRequest request =
         new OrderPricingRequest(lines, BigDecimal.ZERO, BigDecimal.ZERO, true, bd(1000), null);
 
@@ -262,8 +269,10 @@ class OrderPricingServiceTest {
     assertThat(result.getRoundingAdjustment()).isEqualByComparingTo(bd(250));
   }
 
-  /** 1.240 truoc lam tron, don vi 100 -> 1.240/100=12,4 -> HALF_UP -> 12 -> 1.200 (lam tron
-   * xuong vi duoi diem giua). */
+  /**
+   * 1.240 truoc lam tron, don vi 100 -> 1.240/100=12,4 -> HALF_UP -> 12 -> 1.200 (lam tron xuong vi
+   * duoi diem giua).
+   */
   @Test
   void roundingUnitOf100RoundsDownWhenBelowMidpoint() {
     List<OrderLineInput> lines =
@@ -277,8 +286,10 @@ class OrderPricingServiceTest {
     assertThat(result.getRoundingAdjustment()).isEqualByComparingTo(bd(-40));
   }
 
-  /** roundingUnit=null -> OrderPricingRequest tu quy ve BigDecimal.ONE -> khong gom nhom, chi
-   * xac nhan lai gia tri nguyen san co (khong phat sinh chenh lech lam tron). */
+  /**
+   * roundingUnit=null -> OrderPricingRequest tu quy ve BigDecimal.ONE -> khong gom nhom, chi xac
+   * nhan lai gia tri nguyen san co (khong phat sinh chenh lech lam tron).
+   */
   @Test
   void nullRoundingUnitDefaultsToOneAndPerformsNoBucketing() {
     List<OrderLineInput> lines =
@@ -293,9 +304,9 @@ class OrderPricingServiceTest {
   }
 
   /**
-   * 5 dong 1000/2000/3000/4000/5000 (subtotal=15.000), CK don 1000 + voucher 500 = 1500. Ca 4 ty
-   * le dau chia het (100/200/300/400), dong cuoi nhan du (500) — kiem tra khong lech tong dong nao
-   * du co nhieu dong.
+   * 5 dong 1000/2000/3000/4000/5000 (subtotal=15.000), CK don 1000 + voucher 500 = 1500. Ca 4 ty le
+   * dau chia het (100/200/300/400), dong cuoi nhan du (500) — kiem tra khong lech tong dong nao du
+   * co nhieu dong.
    */
   @Test
   void residualAllocationAcrossFiveLinesSumsExactlyToReduction() {
@@ -330,7 +341,8 @@ class OrderPricingServiceTest {
     List<OrderLineInput> lines =
         List.of(new OrderLineInput(1L, bd(100_000), bd(1), BigDecimal.ZERO, BigDecimal.ZERO));
     OrderPricingRequest request =
-        new OrderPricingRequest(lines, BigDecimal.ZERO, BigDecimal.ZERO, true, bd(1000), bd(50_000));
+        new OrderPricingRequest(
+            lines, BigDecimal.ZERO, BigDecimal.ZERO, true, bd(1000), bd(50_000));
 
     OrderPricingResult result = OrderPricingService.calculate(request);
 
@@ -371,8 +383,10 @@ class OrderPricingServiceTest {
     assertThat(result.getLines().get(1).getLineTotal()).isEqualByComparingTo(bd(900));
   }
 
-  /** CK don (150) vuot ca subtotal cua dong duy nhat (100) -> lineTotal am. Ham thuan khong tu
-   * validate/clamp — OrderService phai chan truong hop nay truoc khi goi. */
+  /**
+   * CK don (150) vuot ca subtotal cua dong duy nhat (100) -> lineTotal am. Ham thuan khong tu
+   * validate/clamp — OrderService phai chan truong hop nay truoc khi goi.
+   */
   @Test
   void orderDiscountExceedingLineSubtotalProducesNegativeLineTotal() {
     List<OrderLineInput> lines =
@@ -399,7 +413,9 @@ class OrderPricingServiceTest {
     OrderPricingResult result = OrderPricingService.calculate(request);
 
     assertThat(result.getVatAmount()).isEqualByComparingTo(BigDecimal.ZERO);
-    result.getLines().forEach(line -> assertThat(line.getVatAmount()).isEqualByComparingTo(BigDecimal.ZERO));
+    result
+        .getLines()
+        .forEach(line -> assertThat(line.getVatAmount()).isEqualByComparingTo(BigDecimal.ZERO));
     assertThat(result.getTotalAmount()).isEqualByComparingTo(bd(600));
   }
 

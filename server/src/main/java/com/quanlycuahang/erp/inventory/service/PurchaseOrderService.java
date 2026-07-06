@@ -162,7 +162,8 @@ public class PurchaseOrderService {
       total = total.add(itemRequest.getQuantity().multiply(itemRequest.getUnitPrice()));
     }
 
-    BigDecimal discount = request.getDiscountAmount() == null ? BigDecimal.ZERO : request.getDiscountAmount();
+    BigDecimal discount =
+        request.getDiscountAmount() == null ? BigDecimal.ZERO : request.getDiscountAmount();
     purchaseOrder.setTotalAmount(total);
     purchaseOrder.setDiscountAmount(discount);
     purchaseOrder = purchaseOrderRepository.save(purchaseOrder);

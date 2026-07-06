@@ -6,9 +6,7 @@ import java.math.BigDecimal;
 
 public class OpenShiftRequest {
 
-  @NotNull
-  @PositiveOrZero
-  private BigDecimal openingCash;
+  @NotNull @PositiveOrZero private BigDecimal openingCash;
 
   private String note;
 

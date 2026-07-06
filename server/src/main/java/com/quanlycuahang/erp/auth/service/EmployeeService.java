@@ -48,7 +48,9 @@ public class EmployeeService {
 
   @Transactional(readOnly = true)
   public List<EmployeeResponse> list() {
-    return userRepository.findAllByOrderByFullNameAsc().stream().map(EmployeeService::toResponse).toList();
+    return userRepository.findAllByOrderByFullNameAsc().stream()
+        .map(EmployeeService::toResponse)
+        .toList();
   }
 
   @Transactional
@@ -110,7 +112,8 @@ public class EmployeeService {
   private Set<Role> resolveRoles(Set<Long> roleIds) {
     Set<Role> roles = new HashSet<>(roleRepository.findAllById(roleIds));
     if (roles.size() != roleIds.size()) {
-      throw new BusinessRuleException("EMPLOYEE_INVALID_ROLE", "Mot hoac nhieu vai tro khong ton tai");
+      throw new BusinessRuleException(
+          "EMPLOYEE_INVALID_ROLE", "Mot hoac nhieu vai tro khong ton tai");
     }
     return roles;
   }

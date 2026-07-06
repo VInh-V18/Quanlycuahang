@@ -230,6 +230,25 @@
                     </execution>
                 </executions>
             </plugin>
+
+            <!-- Chay rieng cac *IT.java (Testcontainers, can Docker) o phase integration-test/verify,
+                 tach khoi *Test.java (surefire, phase test) de `mvn test` van chay nhanh va khong can
+                 Docker cho vong lap phat trien thuong ngay — dung `mvn verify` de chay ca 2 (Phase 11/12).
+                 Phat hien thieu plugin nay khi rieng soat CI o Phase 12: truoc do *IT.java (vd
+                 ProductRepositoryIT tu Phase 3) khong bao gio duoc surefire nhan dien va chay, du co
+                 Docker hay khong. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 </project>

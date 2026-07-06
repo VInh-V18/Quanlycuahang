@@ -12,8 +12,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Xem truoc voucher tai POS (UC-11) — dung chung 1 VoucherService.validate() voi luc tao don
- * that (OrderService), tranh sai lech giua "xem truoc" va "ap dung that". */
+/**
+ * Xem truoc voucher tai POS (UC-11) — dung chung 1 VoucherService.validate() voi luc tao don that
+ * (OrderService), tranh sai lech giua "xem truoc" va "ap dung that".
+ */
 @RestController
 @RequestMapping("/api/v1/vouchers")
 public class VoucherController {
@@ -30,6 +32,7 @@ public class VoucherController {
       @RequestParam String code, @RequestParam BigDecimal subtotal) {
     VoucherValidationResult result = voucherService.validate(code, subtotal);
     return ResponseEntity.ok(
-        ApiResponse.success(new VoucherPreviewResponse(result.voucher().getCode(), result.discountAmount())));
+        ApiResponse.success(
+            new VoucherPreviewResponse(result.voucher().getCode(), result.discountAmount())));
   }
 }

@@ -11,8 +11,10 @@ public interface OrderPaymentRepository extends JpaRepository<OrderPayment, Long
 
   List<OrderPayment> findByOrderId(Long orderId);
 
-  /** Tong tien theo hinh thuc thanh toan cua cac don ban trong 1 ca — dung cho doi chieu ket
-   * tien khi dong ca (FH-14). */
+  /**
+   * Tong tien theo hinh thuc thanh toan cua cac don ban trong 1 ca — dung cho doi chieu ket tien
+   * khi dong ca (FH-14).
+   */
   @Query(
       "SELECT COALESCE(SUM(op.amount), 0) FROM OrderPayment op "
           + "WHERE op.order.shift.id = :shiftId AND op.method = :method")

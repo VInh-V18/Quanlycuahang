@@ -10,9 +10,9 @@ import org.springframework.data.repository.query.Param;
 public interface InventoryBatchRepository extends JpaRepository<InventoryBatch, Long> {
 
   /**
-   * Lo gan het han nhat cho tung san pham trong 1 chi nhanh (DISTINCT ON theo product_id, sap
-   * xep theo expiry_date tang dan — NULL xep cuoi) — dung cho cot "Lô/HSD" o Ton kho (FH-7) va
-   * canh bao sap het han o Dashboard/Bao cao.
+   * Lo gan het han nhat cho tung san pham trong 1 chi nhanh (DISTINCT ON theo product_id, sap xep
+   * theo expiry_date tang dan — NULL xep cuoi) — dung cho cot "Lô/HSD" o Ton kho (FH-7) va canh bao
+   * sap het han o Dashboard/Bao cao.
    */
   @Query(
       value =
@@ -23,7 +23,9 @@ public interface InventoryBatchRepository extends JpaRepository<InventoryBatch, 
       nativeQuery = true)
   List<Object[]> findNearestBatchPerProduct(@Param("branchId") Long branchId);
 
-  /** Danh sach lo sap het han trong N ngay toi (dung cho canh bao xa hang/chuong trinh giam gia). */
+  /**
+   * Danh sach lo sap het han trong N ngay toi (dung cho canh bao xa hang/chuong trinh giam gia).
+   */
   @Query(
       value =
           "SELECT b.id, p.name, p.sku, b.batch_code, b.expiry_date, b.quantity "
