@@ -25,6 +25,8 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
 
   java.util.List<Inventory> findByBranchId(Long branchId);
 
+  List<Inventory> findByBranchIdAndProductIdIn(Long branchId, List<Long> productIds);
+
   @Query(
       "SELECT i FROM Inventory i WHERE i.branch.id = :branchId AND i.stock <= i.product.minStock")
   Page<Inventory> findLowStockByBranchId(@Param("branchId") Long branchId, Pageable pageable);

@@ -15,6 +15,9 @@ const DashboardPage = lazy(() =>
 const ProductsPage = lazy(() =>
   import("@/pages/products/ProductsPage").then((m) => ({ default: m.ProductsPage })),
 );
+const ProductFormPage = lazy(() =>
+  import("@/pages/products/ProductFormPage").then((m) => ({ default: m.ProductFormPage })),
+);
 const PosPage = lazy(() => import("@/pages/pos/PosPage").then((m) => ({ default: m.PosPage })));
 const InvoicePrintPage = lazy(() =>
   import("@/pages/invoices/InvoicePrintPage").then((m) => ({ default: m.InvoicePrintPage })),
@@ -79,6 +82,22 @@ const router = createBrowserRouter([
         element: withSuspense(
           <RequirePermission perm="product:view">
             <ProductsPage />
+          </RequirePermission>,
+        ),
+      },
+      {
+        path: "/products/new",
+        element: withSuspense(
+          <RequirePermission perm="product:create">
+            <ProductFormPage />
+          </RequirePermission>,
+        ),
+      },
+      {
+        path: "/products/:id/edit",
+        element: withSuspense(
+          <RequirePermission perm="product:update">
+            <ProductFormPage />
           </RequirePermission>,
         ),
       },

@@ -29,6 +29,9 @@ public interface ProductRepository
               + "     OR immutable_unaccent(lower(p.name)) % immutable_unaccent(lower(:search)) "
               + "     OR p.sku ILIKE '%' || :search || '%' "
               + "     OR p.barcode = :search) "
+              + "AND (:categoryId IS NULL OR p.category_id = :categoryId) "
+              + "AND (:active IS NULL OR p.is_active = :active) "
+              + "AND (:originCountry IS NULL OR p.origin_country = :originCountry) "
               + "ORDER BY p.name",
       countQuery =
           "SELECT count(*) FROM products p WHERE p.deleted_at IS NULL "
@@ -36,7 +39,15 @@ public interface ProductRepository
               + "     OR immutable_unaccent(lower(p.name)) ILIKE '%' || immutable_unaccent(lower(:search)) || '%' "
               + "     OR immutable_unaccent(lower(p.name)) % immutable_unaccent(lower(:search)) "
               + "     OR p.sku ILIKE '%' || :search || '%' "
-              + "     OR p.barcode = :search)",
+              + "     OR p.barcode = :search) "
+              + "AND (:categoryId IS NULL OR p.category_id = :categoryId) "
+              + "AND (:active IS NULL OR p.is_active = :active) "
+              + "AND (:originCountry IS NULL OR p.origin_country = :originCountry)",
       nativeQuery = true)
-  Page<Product> search(@Param("search") String search, Pageable pageable);
+  Page<Product> search(
+      @Param("search") String search,
+      @Param("categoryId") Long categoryId,
+      @Param("active") Boolean active,
+      @Param("originCountry") String originCountry,
+      Pageable pageable);
 }

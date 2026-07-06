@@ -1,51 +1,138 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useNavigate } from "react-router-dom";
+import { MoreHorizontal, Plus, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DataTable, type DataTableColumn, type SortState } from "@/components/common/DataTable";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { DataTable, type DataTableColumn } from "@/components/common/DataTable";
 import { Money } from "@/components/common/Money";
-import { searchProducts, type Product } from "@/lib/api/products";
+import { useToast } from "@/components/ui/use-toast";
+import { listCategories } from "@/lib/api/categories";
+import {
+  deleteProduct,
+  originFlag,
+  searchProducts,
+  type Product,
+} from "@/lib/api/products";
+import { CURRENT_BRANCH_ID } from "@/lib/constants";
 import { getApiErrorMessage } from "@/lib/http/errors";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 20;
 
-/** Demo DataTable thật với API Backend (Gate Phase 5.3: phân trang/sắp xếp/lọc).
- * Ghi chú: Backend `/products` dùng native query có ORDER BY cố định theo tên (chưa hỗ trợ
- * Pageable.sort động — xem docs/phase5/frontend-foundation.md) nên sắp xếp ở demo này thực hiện
- * phía client trên trang dữ liệu hiện tại; phân trang & lọc (search) là gọi API thật. */
 export function ProductsPage() {
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<SortState | null>(null);
+  const [categoryId, setCategoryId] = useState<string>("all");
+  const [active, setActive] = useState<string>("all");
+  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const params = useMemo(
+    () => ({
+      page,
+      size: PAGE_SIZE,
+      search,
+      categoryId: categoryId === "all" ? undefined : Number(categoryId),
+      active: active === "all" ? undefined : active === "active",
+      branchId: CURRENT_BRANCH_ID,
+    }),
+    [page, search, categoryId, active],
+  );
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["products", page, search],
-    queryFn: () => searchProducts({ page, size: PAGE_SIZE, search }),
+    queryKey: ["products", params],
+    queryFn: () => searchProducts(params),
   });
 
-  const rows = useMemo(() => {
-    const list = data?.data ?? [];
-    if (!sort) return list;
-    const factor = sort.direction === "asc" ? 1 : -1;
-    return [...list].sort((a, b) => {
-      const av = a[sort.key as keyof Product];
-      const bv = b[sort.key as keyof Product];
-      if (typeof av === "number" && typeof bv === "number") return (av - bv) * factor;
-      return String(av).localeCompare(String(bv)) * factor;
-    });
-  }, [data, sort]);
+  const categoriesQuery = useQuery({ queryKey: ["categories"], queryFn: listCategories });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => deleteProduct(id),
+    onSuccess: () => {
+      toast({ title: "Đã xóa sản phẩm" });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      setDeleteTarget(null);
+    },
+    onError: (err) => {
+      toast({ variant: "destructive", title: "Không thể xóa", description: getApiErrorMessage(err) });
+    },
+  });
 
   const columns: DataTableColumn<Product>[] = [
-    { key: "sku", header: "SKU", sortable: true },
-    { key: "name", header: "Tên sản phẩm", sortable: true },
+    {
+      key: "name",
+      header: "Sản phẩm",
+      render: (row) => (
+        <div>
+          <div className="font-medium">
+            {row.name} {originFlag(row.originCountry)}
+          </div>
+          <div className="flex gap-2 text-xs text-muted-foreground">
+            <span>{row.sku}</span>
+            {row.barcode && <span>{row.barcode}</span>}
+          </div>
+        </div>
+      ),
+    },
     { key: "categoryName", header: "Danh mục" },
-    { key: "unit", header: "Đơn vị" },
+    {
+      key: "costPrice",
+      header: "Giá vốn",
+      className: "text-right",
+      render: (row) => (row.costPrice != null ? <Money value={row.costPrice} /> : "—"),
+    },
     {
       key: "sellPrice",
       header: "Giá bán",
-      sortable: true,
       className: "text-right",
-      render: (row) => <Money value={row.sellPrice} />,
+      render: (row) => (
+        <span>
+          <Money value={row.sellPrice} />/{row.unit}
+        </span>
+      ),
+    },
+    {
+      key: "vatRate",
+      header: "VAT",
+      className: "text-right",
+      render: (row) => `${row.vatRate}%`,
+    },
+    {
+      key: "stock",
+      header: "Tồn",
+      className: "text-right",
+      render: (row) =>
+        row.stock != null ? (
+          <span className={row.stock <= row.minStock ? "font-semibold text-destructive" : ""}>
+            {row.stock} {row.unit}
+          </span>
+        ) : (
+          "—"
+        ),
     },
     {
       key: "active",
@@ -56,39 +143,130 @@ export function ProductsPage() {
         </Badge>
       ),
     },
+    {
+      key: "id",
+      header: "",
+      render: (row) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => navigate(`/products/${row.id}/edit`)}>
+              Sửa
+            </DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive" onClick={() => setDeleteTarget(row)}>
+              Xóa
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    },
   ];
 
-  function handlePageChange(nextPage: number) {
-    setPage(nextPage);
-  }
-
-  function handleSearchChange(value: string) {
-    setSearch(value);
-    setPage(0);
-  }
-
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Sản phẩm</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <DataTable
-          columns={columns}
-          data={rows}
-          rowKey={(row) => row.id}
-          meta={data?.meta}
-          loading={isLoading}
-          error={isError ? getApiErrorMessage(error) : null}
-          sort={sort}
-          onSortChange={setSort}
-          onPageChange={handlePageChange}
-          searchValue={search}
-          onSearchChange={handleSearchChange}
-          searchPlaceholder="Tìm theo tên, SKU, barcode..."
-          emptyMessage="Không tìm thấy sản phẩm phù hợp"
-        />
-      </CardContent>
-    </Card>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Sản phẩm</h1>
+          <p className="text-sm text-muted-foreground">
+            Hàng hóa / Sản phẩm · {data?.meta?.total ?? 0} SKU
+          </p>
+        </div>
+        <Button asChild size="lg">
+          <Link to="/products/new">
+            <Plus className="h-4 w-4" />
+            Thêm sản phẩm
+          </Link>
+        </Button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative w-64">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(0);
+            }}
+            placeholder="Tìm tên / SKU / barcode"
+            className="pl-8"
+          />
+        </div>
+        <Select
+          value={categoryId}
+          onValueChange={(v) => {
+            setCategoryId(v);
+            setPage(0);
+          }}
+        >
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Danh mục" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Danh mục: Tất cả</SelectItem>
+            {categoriesQuery.data?.map((c) => (
+              <SelectItem key={c.id} value={String(c.id)}>
+                {c.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={active}
+          onValueChange={(v) => {
+            setActive(v);
+            setPage(0);
+          }}
+        >
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="Trạng thái" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Trạng thái: Tất cả</SelectItem>
+            <SelectItem value="active">Đang bán</SelectItem>
+            <SelectItem value="inactive">Ngừng bán</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <DataTable
+        columns={columns}
+        data={data?.data ?? []}
+        rowKey={(row) => row.id}
+        meta={data?.meta}
+        loading={isLoading}
+        error={isError ? getApiErrorMessage(error) : null}
+        onPageChange={setPage}
+        emptyMessage="Không tìm thấy sản phẩm phù hợp"
+      />
+
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Xóa sản phẩm</DialogTitle>
+            <DialogDescription>
+              Bạn có chắc muốn xóa "{deleteTarget?.name}"? Lịch sử giao dịch liên quan vẫn được giữ
+              lại.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Hủy
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteMutation.isPending}
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+            >
+              Xóa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

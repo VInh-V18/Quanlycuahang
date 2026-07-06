@@ -5,6 +5,8 @@ import com.quanlycuahang.erp.common.dto.ApiResponse;
 import com.quanlycuahang.erp.common.exception.BusinessRuleException;
 import com.quanlycuahang.erp.common.exception.ResourceNotFoundException;
 import com.quanlycuahang.erp.common.sequence.NumberSequenceService;
+import com.quanlycuahang.erp.inventory.entity.Inventory;
+import com.quanlycuahang.erp.inventory.repository.InventoryRepository;
 import com.quanlycuahang.erp.product.dto.PriceHistoryResponse;
 import com.quanlycuahang.erp.product.dto.ProductRequest;
 import com.quanlycuahang.erp.product.dto.ProductResponse;
@@ -17,6 +19,10 @@ import com.quanlycuahang.erp.product.repository.PriceHistoryRepository;
 import com.quanlycuahang.erp.product.repository.ProductRepository;
 import com.quanlycuahang.erp.system.service.SettingsService;
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -29,6 +35,7 @@ public class ProductService {
   private final ProductRepository productRepository;
   private final CategoryRepository categoryRepository;
   private final PriceHistoryRepository priceHistoryRepository;
+  private final InventoryRepository inventoryRepository;
   private final ProductMapper productMapper;
   private final SettingsService settingsService;
   private final CurrentUserProvider currentUserProvider;
@@ -38,6 +45,7 @@ public class ProductService {
       ProductRepository productRepository,
       CategoryRepository categoryRepository,
       PriceHistoryRepository priceHistoryRepository,
+      InventoryRepository inventoryRepository,
       ProductMapper productMapper,
       SettingsService settingsService,
       CurrentUserProvider currentUserProvider,
@@ -45,6 +53,7 @@ public class ProductService {
     this.productRepository = productRepository;
     this.categoryRepository = categoryRepository;
     this.priceHistoryRepository = priceHistoryRepository;
+    this.inventoryRepository = inventoryRepository;
     this.productMapper = productMapper;
     this.settingsService = settingsService;
     this.currentUserProvider = currentUserProvider;
@@ -52,9 +61,40 @@ public class ProductService {
   }
 
   @Transactional(readOnly = true)
-  public ApiResponse<java.util.List<ProductResponse>> search(String search, Pageable pageable) {
-    Page<Product> page = productRepository.search(search == null ? "" : search.trim(), pageable);
-    return ApiResponse.page(page.map(productMapper::toResponse));
+  public ApiResponse<java.util.List<ProductResponse>> search(
+      String search,
+      Long categoryId,
+      Boolean active,
+      String originCountry,
+      Long branchId,
+      Pageable pageable) {
+    Page<Product> page =
+        productRepository.search(
+            search == null ? "" : search.trim(), categoryId, active, originCountry, pageable);
+    ApiResponse<java.util.List<ProductResponse>> response =
+        ApiResponse.page(page.map(productMapper::toResponse));
+    if (branchId != null) {
+      enrichWithBranchStock(response.getData(), branchId);
+    }
+    return response;
+  }
+
+  /** Gan ton kho + gia von theo chi nhanh vao moi dong san pham (FH-5) — 1 truy van cho ca trang. */
+  private void enrichWithBranchStock(List<ProductResponse> rows, Long branchId) {
+    if (rows.isEmpty()) {
+      return;
+    }
+    List<Long> productIds = rows.stream().map(ProductResponse::getId).toList();
+    Map<Long, Inventory> byProductId =
+        inventoryRepository.findByBranchIdAndProductIdIn(branchId, productIds).stream()
+            .collect(Collectors.toMap(i -> i.getProduct().getId(), Function.identity()));
+    for (ProductResponse row : rows) {
+      Inventory inventory = byProductId.get(row.getId());
+      if (inventory != null) {
+        row.setStock(inventory.getStock());
+        row.setCostPrice(inventory.getCostPrice());
+      }
+    }
   }
 
   @Transactional(readOnly = true)

@@ -20,6 +20,11 @@ public class ProductResponse {
   private String originCountry;
   private String originRegion;
 
+  /** Ton kho + gia von theo chi nhanh — chi co gia tri khi search() duoc goi kem branchId. */
+  private BigDecimal stock;
+
+  private BigDecimal costPrice;
+
   public Long getId() {
     return id;
   }
@@ -138,5 +143,21 @@ public class ProductResponse {
 
   public void setOriginRegion(String originRegion) {
     this.originRegion = originRegion;
+  }
+
+  public BigDecimal getStock() {
+    return stock;
+  }
+
+  public void setStock(BigDecimal stock) {
+    this.stock = stock;
+  }
+
+  public BigDecimal getCostPrice() {
+    return costPrice;
+  }
+
+  public void setCostPrice(BigDecimal costPrice) {
+    this.costPrice = costPrice;
   }
 }

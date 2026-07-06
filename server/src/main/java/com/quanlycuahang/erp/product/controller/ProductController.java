@@ -34,8 +34,14 @@ public class ProductController {
   @GetMapping
   @PreAuthorize("hasAuthority('product:view')")
   public ResponseEntity<ApiResponse<List<ProductResponse>>> search(
-      @RequestParam(required = false, defaultValue = "") String search, Pageable pageable) {
-    return ResponseEntity.ok(productService.search(search, pageable));
+      @RequestParam(required = false, defaultValue = "") String search,
+      @RequestParam(required = false) Long categoryId,
+      @RequestParam(required = false) Boolean active,
+      @RequestParam(required = false) String originCountry,
+      @RequestParam(required = false) Long branchId,
+      Pageable pageable) {
+    return ResponseEntity.ok(
+        productService.search(search, categoryId, active, originCountry, branchId, pageable));
   }
 
   @GetMapping("/{id}")
