@@ -1,4 +1,40 @@
-## PROJECT_STATE — sau Phase 10 — 2026-07-06
+## PROJECT_STATE — sau Phase 11 — 2026-07-06
+
+### Đã chốt (FH-1 → FH-16 — Redesign giao diện FruitHouse + tính năng mới)
+Sau Phase 10, toàn bộ FE được redesign lại theo mockup FruitHouse (theme jade, sidebar tối màu cố
+định) và bổ sung 6 tính năng nghiệp vụ hoàn toàn mới ở cả Backend lẫn FE (trước đó chưa có
+Controller/Service/trang nào): Công nợ chi tiết (aging theo đối tác + đối chiếu + ghi nhận thanh
+toán FIFO), Ma trận phân quyền (CRUD nhân viên + lưới sửa quyền theo vai trò), Ca & két tiền (mở/
+đóng ca, thu chi tiền mặt, đối chiếu ket tien nối trực tiếp vào POS), Báo cáo (chart 2 chuỗi Doanh
+thu/Lợi nhuận), Cài đặt (đọc/ghi cấu hình `settings` thật, nối `login_rate_limit_attempts` vào
+AuthService runtime). Chi tiết từng trang không lặp lại ở đây — xem lịch sử commit
+`FH-1`..`FH-16` trên nhánh `claude/new-session-4qaqne`. Nhân tiện rà soát hồi quy toàn bộ 16 trang
+bằng Playwright, phát hiện và sửa 1 bug thật ở tầng nền tảng Phase 2 (không liên quan FH): cơ chế
+rotation refresh token thu hồi nhầm cả chuỗi (đăng xuất oan) khi có ≥2 lệnh `/auth/refresh` đua
+nhau dùng cùng 1 token hợp lệ (xảy ra thật ở multi-tab hoặc React StrictMode dev) — sửa bằng cách
+giữ mỗi jti vừa rotate qua trong 1 khóa Redis riêng có TTL 30 giây thay vì 1 ô nhớ chung.
+
+### Đã chốt (Phase 11 — Testing)
+- `OrderPricingServiceTest` mở rộng từ 3 lên 23 case, phủ hết 7 bước B4 riêng lẻ và kết hợp (CK
+  dòng về 0, guard chia 0 khi subtotal triệt tiêu, phân bổ CK đơn/voucher dư vào dòng cuối không
+  lệch dù 5 dòng, VAT trộn/trên nhiều thuế suất/thuế suất 0%, số lượng lẻ làm tròn HALF_UP, 3 mức
+  làm tròn 500/100/null, tiền thừa âm, số lượng 0). Tự phát hiện và sửa 5 lỗi tính tay trong chính
+  test mới viết (dùng `roundingUnit=1000` lúc muốn kiểm tra tổng trước làm tròn, vô tình trúng
+  điểm giữa làm tròn đổi kết quả) trước khi coi là xong — cùng kỷ luật "verify bằng chạy thật" như
+  mọi Phase trước, chỉ khác đối tượng chạy thật ở đây là chính bộ test.
+- Testcontainers integration test mới: `DebtRepositoryIT` (khóa lại bug thật FH-12 — JOIN UNION ALL
+  customers/suppliers theo id trùng lặp từng làm lẫn tên đối tác sai chiều nợ) và
+  `OrderRepositoryRevenueIT` (khóa lại cách tính giá vốn theo từng nhóm thêm ở FH-15 — subquery
+  riêng tránh nhân đôi revenue trên đơn nhiều dòng). Môi trường sandbox làm Phase 11 vẫn KHÔNG có
+  Docker daemon (đã xác minh lại qua `docker ps` và `service docker start` đều thất bại, đúng tình
+  trạng ghi nhận từ Phase 3) — 2 file compile sạch, logic query đã verify gián tiếp qua curl thật
+  trên Postgres 16 local trong lúc làm FH-12/FH-15, chạy được thật trên CI/local có Docker.
+- Playwright E2E chính thức lần đầu (trước giờ chỉ chạy script tay để verify, không phải test suite
+  commit vào repo): cài `@playwright/test`, `playwright.config.ts` trỏ thẳng Chromium cài sẵn trong
+  môi trường (không tải lại), 5 test thật chạy qua `npm run test:e2e` — đăng nhập đúng/sai, bán
+  hàng POS end-to-end, trang Công nợ, trang Ca & két tiền. Bug thật tự phát hiện lúc chạy lần đầu:
+  toast Radix render 2 node cùng text (div hiển thị + span `aria-live` cho screen reader) khiến
+  `getByText` strict-mode violation — sửa bằng `.first()`.
 
 ### Đã chốt (Phase 10 — Báo cáo)
 - **Bug thật phát hiện qua verify actuator**: `spring-boot-starter-mail` (thêm ở Phase 9) tự đăng
@@ -264,8 +300,8 @@ Quanlycuahang/
 - **Rủi ro**: `ProductRepositoryIT` chưa được CI thực thi trong phiên làm việc này do thiếu Docker — cần chạy xác nhận trên môi trường có Docker trước khi merge.
 
 ### Kế tiếp
-Phase 0–10 của master prompt đã hoàn tất (Khởi tạo, Nghiệp vụ, Kiến trúc, Database, Thiết kế giao
-diện, Frontend Foundation, Backend Foundation, Sản phẩm & Kho, Bán hàng POS, Hóa đơn, Báo cáo).
-Phase tiếp theo chưa được yêu cầu thực hiện:
-- Phase 11: Testing (unit đầy đủ OrderPricingService ≥20 case, Testcontainers integration, Playwright E2E chính thức)
+Phase 0–11 của master prompt đã hoàn tất (Khởi tạo, Nghiệp vụ, Kiến trúc, Database, Thiết kế giao
+diện, Frontend Foundation, Backend Foundation, Sản phẩm & Kho, Bán hàng POS, Hóa đơn, Báo cáo,
+Testing), cộng thêm FH-1 → FH-16 (redesign FruitHouse + 6 tính năng mới ngoài phạm vi master
+prompt gốc). Phase tiếp theo chưa được yêu cầu thực hiện:
 - Phase 12: DevOps & tài liệu (Docker Compose, CI, README vận hành)
