@@ -42,6 +42,15 @@ const StockTakeDetailPage = lazy(() =>
     default: m.StockTakeDetailPage,
   })),
 );
+const OrdersPage = lazy(() =>
+  import("@/pages/orders/OrdersPage").then((m) => ({ default: m.OrdersPage })),
+);
+const ReturnCreatePage = lazy(() =>
+  import("@/pages/orders/ReturnCreatePage").then((m) => ({ default: m.ReturnCreatePage })),
+);
+const ReturnsSearchPage = lazy(() =>
+  import("@/pages/orders/ReturnsSearchPage").then((m) => ({ default: m.ReturnsSearchPage })),
+);
 const PosPage = lazy(() => import("@/pages/pos/PosPage").then((m) => ({ default: m.PosPage })));
 const InvoicePrintPage = lazy(() =>
   import("@/pages/invoices/InvoicePrintPage").then((m) => ({ default: m.InvoicePrintPage })),
@@ -122,6 +131,30 @@ const router = createBrowserRouter([
         element: withSuspense(
           <RequirePermission perm="product:update">
             <ProductFormPage />
+          </RequirePermission>,
+        ),
+      },
+      {
+        path: "/orders",
+        element: withSuspense(
+          <RequirePermission perm="order:view">
+            <OrdersPage />
+          </RequirePermission>,
+        ),
+      },
+      {
+        path: "/orders/:id/return",
+        element: withSuspense(
+          <RequirePermission perm="return:create">
+            <ReturnCreatePage />
+          </RequirePermission>,
+        ),
+      },
+      {
+        path: "/returns",
+        element: withSuspense(
+          <RequirePermission perm="return:create">
+            <ReturnsSearchPage />
           </RequirePermission>,
         ),
       },

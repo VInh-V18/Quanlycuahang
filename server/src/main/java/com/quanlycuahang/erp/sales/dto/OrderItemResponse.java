@@ -12,6 +12,7 @@ public class OrderItemResponse {
   private BigDecimal discountAmount;
   private BigDecimal vatAmount;
   private BigDecimal lineTotal;
+  private BigDecimal returnedQuantity;
 
   public Long getId() {
     return id;
@@ -75,5 +76,13 @@ public class OrderItemResponse {
 
   public void setLineTotal(BigDecimal lineTotal) {
     this.lineTotal = lineTotal;
+  }
+
+  public BigDecimal getReturnedQuantity() {
+    return returnedQuantity;
+  }
+
+  public void setReturnedQuantity(BigDecimal returnedQuantity) {
+    this.returnedQuantity = returnedQuantity;
   }
 }

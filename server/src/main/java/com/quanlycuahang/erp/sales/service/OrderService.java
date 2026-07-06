@@ -23,9 +23,11 @@ import com.quanlycuahang.erp.product.repository.ProductRepository;
 import com.quanlycuahang.erp.promotion.entity.Voucher;
 import com.quanlycuahang.erp.promotion.service.VoucherService;
 import com.quanlycuahang.erp.promotion.service.VoucherValidationResult;
+import com.quanlycuahang.erp.common.dto.ApiResponse;
 import com.quanlycuahang.erp.sales.dto.OrderCreateRequest;
 import com.quanlycuahang.erp.sales.dto.OrderItemResponse;
 import com.quanlycuahang.erp.sales.dto.OrderLineRequest;
+import com.quanlycuahang.erp.sales.dto.OrderListItemResponse;
 import com.quanlycuahang.erp.sales.dto.OrderPaymentResponse;
 import com.quanlycuahang.erp.sales.dto.OrderResponse;
 import com.quanlycuahang.erp.sales.entity.Order;
@@ -44,12 +46,18 @@ import com.quanlycuahang.erp.system.entity.Branch;
 import com.quanlycuahang.erp.system.repository.BranchRepository;
 import com.quanlycuahang.erp.system.service.SettingsService;
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -375,6 +383,72 @@ public class OrderService {
     return toResponse(order);
   }
 
+  private static final ZoneId APP_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+  private static final Map<String, String> PAYMENT_METHOD_LABELS =
+      Map.of("cash", "Tiền mặt", "bank_transfer", "Chuyển khoản", "card", "Thẻ");
+
+  /** Danh sach don hang co loc (FH-9) — dung cho trang Don hang. */
+  @Transactional(readOnly = true)
+  public ApiResponse<List<OrderListItemResponse>> list(
+      Long branchId,
+      LocalDate from,
+      LocalDate to,
+      String status,
+      Long cashierId,
+      String search,
+      Pageable pageable) {
+    OffsetDateTime fromDateTime = from == null ? null : from.atStartOfDay(APP_ZONE).toOffsetDateTime();
+    OffsetDateTime toDateTime = to == null ? null : to.plusDays(1).atStartOfDay(APP_ZONE).toOffsetDateTime();
+    Page<Object[]> page =
+        orderRepository.search(
+            branchId,
+            fromDateTime,
+            toDateTime,
+            status,
+            cashierId,
+            search == null ? "" : search.trim(),
+            pageable);
+    Page<OrderListItemResponse> mapped = page.map(OrderService::toListItem);
+    return ApiResponse.page(mapped);
+  }
+
+  private static OrderListItemResponse toListItem(Object[] row) {
+    OrderListItemResponse response = new OrderListItemResponse();
+    response.setId(((Number) row[0]).longValue());
+    response.setOrderNumber((String) row[1]);
+    response.setCreatedAt(toInstant(row[2]));
+    response.setStatus((String) row[3]);
+    response.setTotalAmount((BigDecimal) row[4]);
+    response.setCustomerName((String) row[5]);
+    response.setCustomerPhone((String) row[6]);
+    response.setCashierName((String) row[7]);
+    response.setHasDebt((Boolean) row[8]);
+    String rawMethods = (String) row[9];
+    response.setPaymentMethods(
+        rawMethods == null || rawMethods.isBlank()
+            ? List.of()
+            : Arrays.stream(rawMethods.split(","))
+                .map(m -> PAYMENT_METHOD_LABELS.getOrDefault(m, m))
+                .toList());
+    return response;
+  }
+
+  private static Instant toInstant(Object value) {
+    if (value == null) {
+      return null;
+    }
+    if (value instanceof Instant instant) {
+      return instant;
+    }
+    if (value instanceof OffsetDateTime odt) {
+      return odt.toInstant();
+    }
+    if (value instanceof java.sql.Timestamp ts) {
+      return ts.toInstant();
+    }
+    throw new IllegalStateException("Khong the chuyen doi thoi gian: " + value.getClass());
+  }
+
   /**
    * Huy don hoan tat (UC-13): chi trong ngay tao don, hoan kho + cong no trong cung 1 transaction
    * (B4). Quyen han che qua @PreAuthorize o Controller (chi Quan ly/Chu cua hang co order:void —
@@ -462,6 +536,7 @@ public class OrderService {
                   itemResponse.setDiscountAmount(item.getDiscountAmount());
                   itemResponse.setVatAmount(item.getVatAmount());
                   itemResponse.setLineTotal(item.getLineTotal());
+                  itemResponse.setReturnedQuantity(item.getReturnedQuantity());
                   return itemResponse;
                 })
             .toList();

@@ -121,4 +121,44 @@ public interface OrderRepository
               + "ORDER BY o.created_at DESC LIMIT :limit",
       nativeQuery = true)
   List<Object[]> findRecentOrders(@Param("branchId") Long branchId, @Param("limit") int limit);
+
+  /** Danh sach don hang co loc, dung cho trang Don hang (FH-9). payment_methods gop cac phuong
+   * thuc thanh toan da ghi nhan (co the rong neu don ghi no hoan toan chua thu dong nao). */
+  @Query(
+      value =
+          "SELECT o.id, o.order_number, o.created_at, o.status, o.total_amount, "
+              + "COALESCE(c.name, 'Khách lẻ') AS customer_name, c.phone AS customer_phone, "
+              + "u.full_name AS cashier_name, "
+              + "EXISTS(SELECT 1 FROM debts d WHERE d.reference_type = 'order' AND d.reference_id = o.id "
+              + "AND d.direction = 'receivable' AND d.amount > 0 AND d.deleted_at IS NULL) AS has_debt, "
+              + "(SELECT string_agg(DISTINCT p.method, ',') FROM order_payments p "
+              + "WHERE p.order_id = o.id AND p.deleted_at IS NULL) AS payment_methods "
+              + "FROM orders o LEFT JOIN customers c ON c.id = o.customer_id "
+              + "JOIN users u ON u.id = o.cashier_id "
+              + "WHERE o.branch_id = :branchId "
+              + "AND (CAST(:from AS timestamptz) IS NULL OR o.created_at >= CAST(:from AS timestamptz)) "
+              + "AND (CAST(:to AS timestamptz) IS NULL OR o.created_at < CAST(:to AS timestamptz)) "
+              + "AND (CAST(:status AS varchar) IS NULL OR o.status = CAST(:status AS varchar)) "
+              + "AND (CAST(:cashierId AS bigint) IS NULL OR o.cashier_id = CAST(:cashierId AS bigint)) "
+              + "AND (:search = '' OR o.order_number ILIKE '%' || :search || '%' "
+              + "     OR c.name ILIKE '%' || :search || '%' OR c.phone ILIKE '%' || :search || '%') "
+              + "ORDER BY o.created_at DESC",
+      countQuery =
+          "SELECT count(*) FROM orders o LEFT JOIN customers c ON c.id = o.customer_id "
+              + "WHERE o.branch_id = :branchId "
+              + "AND (CAST(:from AS timestamptz) IS NULL OR o.created_at >= CAST(:from AS timestamptz)) "
+              + "AND (CAST(:to AS timestamptz) IS NULL OR o.created_at < CAST(:to AS timestamptz)) "
+              + "AND (CAST(:status AS varchar) IS NULL OR o.status = CAST(:status AS varchar)) "
+              + "AND (CAST(:cashierId AS bigint) IS NULL OR o.cashier_id = CAST(:cashierId AS bigint)) "
+              + "AND (:search = '' OR o.order_number ILIKE '%' || :search || '%' "
+              + "     OR c.name ILIKE '%' || :search || '%' OR c.phone ILIKE '%' || :search || '%')",
+      nativeQuery = true)
+  Page<Object[]> search(
+      @Param("branchId") Long branchId,
+      @Param("from") OffsetDateTime from,
+      @Param("to") OffsetDateTime to,
+      @Param("status") String status,
+      @Param("cashierId") Long cashierId,
+      @Param("search") String search,
+      Pageable pageable);
 }
