@@ -1,4 +1,33 @@
-## PROJECT_STATE — sau Phase 8 — 2026-07-05
+## PROJECT_STATE — sau Phase 5 — 2026-07-06
+
+### Đã chốt (Phase 5 — Frontend Foundation)
+- **2 bug thật phát hiện khi verify bằng trình duyệt thật (Playwright + Chromium)** — cả hai
+  chỉ lộ ra vì test bằng trình duyệt thật, không phải curl: (1) `AuthController` hard-code cookie
+  refresh token `Secure=true` khiến trình duyệt từ chối lưu cookie khi chạy `http://localhost`
+  (RFC 6265) — đã sửa bằng property `app.auth.refresh-cookie-secure` (mặc định `true`, override
+  `false` chỉ ở `application-local.yml`); (2) origin `127.0.0.1:5173` không khớp CORS whitelist
+  `localhost:5173` gây lỗi mạng chung chung. Chi tiết: `docs/phase5/frontend-foundation.md`.
+- Scaffold Vite 5 + React 18 + TS 5 + Tailwind 3 (ép version thủ công vì `npm create vite` mặc
+  định cài bản mới nhất, vi phạm Part C đã chốt); shadcn/ui viết tay từng primitive (không dùng
+  CLI vì sandbox không truy cập được registry ngoài whitelist).
+- 3 layout (`MainLayout` Sidebar+Topbar, `AuthLayout`, `PosLayout` toàn màn hình 2 cột) đúng
+  `docs/phase4/layout.md`/`pos-design.md`; router `react-router-dom` 6 + `React.lazy` (xác nhận
+  code-splitting qua `vite build` — mỗi trang 1 chunk riêng); dark/light qua Redux `ui.theme`.
+- `apiClient` (axios) tự refresh khi 401 (hàng đợi chống refresh trùng lặp); `bootstrapSession()`
+  silent-refresh lúc khởi động app để F5 giữa ca không đá thu ngân về `/login` dù access token
+  chỉ sống trong RAM (D3); Redux Toolkit + `redux-persist` chỉ persist `cart`/`ui`, **`auth`
+  không bao giờ persist**; TanStack Query cho toàn bộ dữ liệu API; RHF + Zod cho form.
+- Component nền đủ theo Gate: `DataTable` (đọc `meta.page/limit/total`), `FormField`,
+  `ConfirmDialog`, `Money`, `DateRangePicker`, `Toast`, `PermissionGate` + `RequireAuth`/
+  `RequirePermission` (route guard).
+- **Nợ kỹ thuật đã ghi nhận** (không phải lỗi ẩn): endpoint `/products`, `/customers` dùng native
+  query có `ORDER BY` cố định (Phase 7) nên không nhận `Pageable.getSort()` động — demo sắp xếp ở
+  `ProductsPage` tạm làm phía client trên trang hiện tại; cần chuyển sang
+  `JpaSpecificationExecutor` khi xây màn danh sách thật cho từng module.
+- Đã verify toàn bộ luồng bằng Playwright + Chromium thật (không chỉ đọc code): đăng nhập sai/đúng,
+  redirect chưa đăng nhập, reload giữ phiên, DataTable phân trang/lọc/sắp xếp với dữ liệu thật,
+  POS layout, dark mode, đăng xuất xoá cookie, chặn truy cập sau đăng xuất. Bảng đầy đủ tại
+  `docs/phase5/frontend-foundation.md`.
 
 ### Đã chốt (Phase 8 — Module Bán hàng POS, QUAN TRỌNG NHẤT)
 - **Bug thật phát hiện qua test tích hợp 2 luồng (gate bắt buộc)**: `generateOrderNumber()`/`generateInvoiceNumber()`/`generateSku()` dùng pattern `count()+existsBy()` không atomic — 2 request tạo đơn đồng thời đọc cùng `count()` trước khi bên nào commit, sinh trùng `order_number`, vi phạm unique constraint, che mất lỗi `PRODUCT_OUT_OF_STOCK` đúng nghĩa (trả về `409 CONFLICT` chung chung thay vì đúng mã lỗi nghiệp vụ). Đã sửa bằng PostgreSQL `SEQUENCE` (migration `V3__number_sequences.sql` + `NumberSequenceService` dùng chung) — atomic ở mức DB, không phụ thuộc transaction isolation. Verify lại: 1 luồng thành công/1 luồng đúng `PRODUCT_OUT_OF_STOCK`, tồn kho cuối chính xác. Chi tiết: `docs/phase8/pos-module.md`.
@@ -51,7 +80,20 @@
 ### Cấu trúc project hiện tại
 ```
 Quanlycuahang/
-├── client/                          # rỗng — khởi tạo ở Phase 5
+├── client/                          # Vite + React 18 + TS 5 (Phase 5)
+│   ├── src/
+│   │   ├── main.tsx, App.tsx, index.css
+│   │   ├── components/
+│   │   │   ├── ui/          # 18 primitive shadcn (button, input, dialog, form, toast...)
+│   │   │   ├── layout/      # MainLayout, AuthLayout, PosLayout, Sidebar, Topbar, ThemeToggle
+│   │   │   └── common/      # DataTable, FormField, ConfirmDialog, Money, DateRangePicker, PermissionGate
+│   │   ├── pages/           # auth/LoginPage, DashboardPage, products/ProductsPage, pos/PosPage, NotFound/Forbidden
+│   │   ├── routes/          # router.tsx, RequireAuth, RequirePermission
+│   │   ├── store/           # index.ts (Redux + persist), slices/{auth,cart,ui}Slice
+│   │   ├── lib/{http,api}/  # apiClient (refresh interceptor), queryClient, bootstrap, auth.ts, products.ts
+│   │   └── types/           # api.ts (ApiResponse<T>), permission.ts
+│   ├── package.json, tailwind.config.ts, vite.config.ts, tsconfig*.json
+│   └── *.test.ts(x)         # Vitest — utils, jwt decode, Money (6 test)
 ├── server/
 │   ├── pom.xml
 │   └── src/
@@ -88,7 +130,8 @@ Quanlycuahang/
 │   ├── phase4/  (design-tokens, layout, wireframes, pos-design, ui-states)
 │   ├── phase6/backend-foundation.md
 │   ├── phase7/product-inventory-module.md
-│   └── phase8/pos-module.md
+│   ├── phase8/pos-module.md
+│   └── phase5/frontend-foundation.md
 ├── scripts/                         # rỗng
 ├── .env.example, .gitignore, README.md
 ```
@@ -106,9 +149,15 @@ Quanlycuahang/
 - Upload: `POST /api/v1/uploads`, `GET /api/v1/uploads/{fileName}` (permitAll)
 - Actuator mặc định (`/actuator/health`, `/actuator/info`)
 - **Nợ**: chưa có `BranchController` (CRUD chi nhánh) — hiện chỉ có `BranchRepository`, dùng nội bộ trong `OrderService`/`SettingsService`; cần bổ sung nếu FE cần màn quản lý chi nhánh
+- Property mới `app.auth.refresh-cookie-secure` (phát hiện ở Phase 5 khi verify bằng trình duyệt thật — xem mục Phase 5 bên dưới)
 
 ### FE đã sinh
-- Chưa có code (thư mục `client/` để trống) — nhưng đã có đầy đủ thiết kế: design tokens + `tailwind.config.ts` sẵn dùng, layout, 15+1 wireframe, chuẩn UI states — khởi tạo code thật ở Phase 5
+- Scaffold đầy đủ Vite + React 18 + TS 5 + Tailwind 3, 18 component `ui/` (shadcn viết tay), 3
+  layout, router lazy-load, Redux+persist, axios refresh interceptor, TanStack Query, RHF+Zod.
+- 2 trang thật gọi API Backend: `LoginPage` (đăng nhập/đăng xuất/refresh), `ProductsPage`
+  (`DataTable` phân trang/lọc/sắp xếp với dữ liệu thật). `DashboardPage`/`PosPage` là khung/placeholder
+  (số liệu và tính năng bán hàng thật thuộc phạm vi module riêng, ngoài Phase 5 Foundation).
+- Chi tiết đầy đủ + bảng verify bằng trình duyệt thật: `docs/phase5/frontend-foundation.md`.
 
 ### Nợ kỹ thuật / dang dở
 - Chưa có Dockerfile/docker-compose.yml — Phase 12
@@ -118,6 +167,14 @@ Quanlycuahang/
 - Wireframe hiện là mô tả text + Mermaid box diagram (chưa phải hình ảnh/Figma) — đủ chi tiết để code Phase 5 nhưng không có mockup trực quan; có thể bổ sung sau nếu cần
 - Chưa có `BranchController` (CRUD chi nhánh qua API) — chỉ 1 chi nhánh seed sẵn, đủ cho Phase 8 test nhưng cần bổ sung trước khi FE cần màn quản lý đa chi nhánh
 - Chưa seed `vouchers` mẫu trong `V2__seed_data.sql` (test Phase 8 tự thêm 1 voucher tạm qua SQL trực tiếp, không lưu vào migration) — nên bổ sung vào seed data chính thức ở phase sau nếu cần demo
+- `DataTable` sắp xếp mới hoạt động phía client (trang hiện tại) cho `/products` vì native query Phase 7 có `ORDER BY` cố định, chưa nhận `Pageable.getSort()` động — xem `docs/phase5/frontend-foundation.md` để biết cách chuyển sang `JpaSpecificationExecutor` khi cần sắp xếp server-side thật cho từng module
+- Chưa có endpoint `/me` (thông tin user hiện tại) — FE giải mã payload JWT (`sub`, `authorities`) để lấy username/quyền hiển thị UI, `fullName` tạm dùng lại `username` vì token không có trường này; nên bổ sung `/me` nếu cần hiển thị đầy đủ hồ sơ nhân viên
+- Các trang nghiệp vụ FE (CRUD sản phẩm/khách hàng/kho, giỏ hàng POS thật, báo cáo...) chưa xây — Phase 5 chỉ là "Foundation" (scaffold + hạ tầng + component nền) đúng phạm vi master prompt, không phải toàn bộ giao diện
+
+### Tự đánh giá Phase 5
+- **Mạnh**: verify bằng Playwright + Chromium thật (không chỉ đọc code hay chỉ chạy Vitest) — phát hiện 2 bug thật (cookie Secure chặn refresh ở dev local, CORS origin 127.0.0.1 vs localhost) mà chỉ hiện ra khi trình duyệt thật áp dụng đúng chính sách cookie/CORS, curl không bao giờ phát hiện được; DataTable/routing/theme/auth đều test qua thao tác thật trên UI, có ảnh chụp màn hình đối chiếu.
+- **Thiếu**: chưa xây các trang nghiệp vụ thật ngoài Products demo; DataTable sort chưa server-side cho mọi endpoint (đã ghi nợ kỹ thuật rõ ràng ở trên); chưa có test Playwright tự động hoá trong CI (mới chạy tay 1 lần), nên viết thành E2E suite chính thức ở Phase 11.
+- **Rủi ro**: `fullName` hiển thị tạm bằng `username` do thiếu endpoint `/me`; nếu sau này thêm claim `fullName` vào JWT cần nhớ cập nhật `decodeJwtPayload`/`AccessTokenClaims` cho khớp.
 
 ### Tự đánh giá Phase 8
 - **Mạnh**: đúng kỷ luật verify bằng ứng dụng chạy thật + test tích hợp đa luồng (không chỉ unit test) theo đúng yêu cầu gate — phát hiện 1 bug thật (race condition sinh số đơn/hoá đơn/SKU) và 1 gap thật (thiếu `orderItemId` trong response) mà unit test/compile không thể phát hiện được, vì cả hai chỉ lộ ra khi có 2 request đồng thời chạm DB thật hoặc khi thử dùng đúng luồng trả hàng end-to-end.
@@ -135,4 +192,10 @@ Quanlycuahang/
 - **Rủi ro**: `ProductRepositoryIT` chưa được CI thực thi trong phiên làm việc này do thiếu Docker — cần chạy xác nhận trên môi trường có Docker trước khi merge.
 
 ### Kế tiếp
-- Phase 5: Frontend Foundation (5.1 Vite+TS+Tailwind+shadcn, 5.2 axios+TanStack Query+Redux, 5.3 component nền DataTable/FormField/ConfirmDialog/Money/DateRangePicker/Toast/PermissionGate)
+Phase 1–8 của master prompt đã hoàn tất (0 Khởi tạo, 1 Nghiệp vụ, 2 Kiến trúc, 3 Database,
+4 Thiết kế giao diện, 5 Frontend Foundation, 6 Backend Foundation, 7 Sản phẩm & Kho, 8 Bán hàng
+POS). Phase tiếp theo chưa được yêu cầu thực hiện:
+- Phase 9: Module Hóa đơn (endpoint JSON hóa đơn đầy đủ + template in K80/A4 FE + gửi email)
+- Phase 10: Báo cáo (doanh thu/lợi nhuận gộp/tồn kho/công nợ, xuất Excel)
+- Phase 11: Testing (unit đầy đủ OrderPricingService ≥20 case, Testcontainers integration, Playwright E2E chính thức)
+- Phase 12: DevOps & tài liệu (Docker Compose, CI, README vận hành)

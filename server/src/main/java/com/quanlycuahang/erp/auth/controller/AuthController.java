@@ -10,6 +10,7 @@ import com.quanlycuahang.erp.common.dto.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.time.Duration;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -32,9 +33,13 @@ public class AuthController {
   private static final String REFRESH_COOKIE_PATH = "/api/v1/auth";
 
   private final AuthService authService;
+  private final boolean refreshCookieSecure;
 
-  public AuthController(AuthService authService) {
+  public AuthController(
+      AuthService authService,
+      @Value("${app.auth.refresh-cookie-secure:true}") boolean refreshCookieSecure) {
     this.authService = authService;
+    this.refreshCookieSecure = refreshCookieSecure;
   }
 
   @PostMapping("/login")
@@ -64,7 +69,7 @@ public class AuthController {
     ResponseCookie clearCookie =
         ResponseCookie.from(REFRESH_COOKIE_NAME, "")
             .httpOnly(true)
-            .secure(true)
+            .secure(refreshCookieSecure)
             .sameSite("Strict")
             .path(REFRESH_COOKIE_PATH)
             .maxAge(0)
@@ -86,7 +91,7 @@ public class AuthController {
     ResponseCookie cookie =
         ResponseCookie.from(REFRESH_COOKIE_NAME, tokens.refreshToken())
             .httpOnly(true)
-            .secure(true)
+            .secure(refreshCookieSecure)
             .sameSite("Strict")
             .path(REFRESH_COOKIE_PATH)
             .maxAge(Duration.ofMillis(tokens.refreshTokenTtlMillis()))

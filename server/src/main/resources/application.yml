@@ -49,6 +49,8 @@ app:
   jwt:
     access-token-ttl-minutes: 15
     refresh-token-ttl-days: 7
+  auth:
+    refresh-cookie-secure: true
   upload:
     dir: ${UPLOAD_DIR:./uploads}
   vietqr:
