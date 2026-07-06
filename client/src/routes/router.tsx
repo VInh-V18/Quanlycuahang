@@ -18,6 +18,9 @@ const ProductsPage = lazy(() =>
 const ProductFormPage = lazy(() =>
   import("@/pages/products/ProductFormPage").then((m) => ({ default: m.ProductFormPage })),
 );
+const InventoryPage = lazy(() =>
+  import("@/pages/inventory/InventoryPage").then((m) => ({ default: m.InventoryPage })),
+);
 const PurchaseOrdersPage = lazy(() =>
   import("@/pages/purchase-orders/PurchaseOrdersPage").then((m) => ({
     default: m.PurchaseOrdersPage,
@@ -108,6 +111,14 @@ const router = createBrowserRouter([
         element: withSuspense(
           <RequirePermission perm="product:update">
             <ProductFormPage />
+          </RequirePermission>,
+        ),
+      },
+      {
+        path: "/inventory",
+        element: withSuspense(
+          <RequirePermission perm="inventory:view">
+            <InventoryPage />
           </RequirePermission>,
         ),
       },
