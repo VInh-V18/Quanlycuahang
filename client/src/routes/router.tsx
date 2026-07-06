@@ -63,6 +63,9 @@ const EmployeesPage = lazy(() =>
 const ShiftsPage = lazy(() =>
   import("@/pages/shifts/ShiftsPage").then((m) => ({ default: m.ShiftsPage })),
 );
+const SettingsPage = lazy(() =>
+  import("@/pages/settings/SettingsPage").then((m) => ({ default: m.SettingsPage })),
+);
 const PosPage = lazy(() => import("@/pages/pos/PosPage").then((m) => ({ default: m.PosPage })));
 const InvoicePrintPage = lazy(() =>
   import("@/pages/invoices/InvoicePrintPage").then((m) => ({ default: m.InvoicePrintPage })),
@@ -255,6 +258,14 @@ const router = createBrowserRouter([
         element: withSuspense(
           <RequirePermission perm="shift:view">
             <ShiftsPage />
+          </RequirePermission>,
+        ),
+      },
+      {
+        path: "/settings",
+        element: withSuspense(
+          <RequirePermission perm="settings:view">
+            <SettingsPage />
           </RequirePermission>,
         ),
       },

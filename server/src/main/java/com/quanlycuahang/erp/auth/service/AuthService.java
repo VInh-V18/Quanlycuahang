@@ -8,6 +8,7 @@ import com.quanlycuahang.erp.auth.security.JwtService;
 import com.quanlycuahang.erp.auth.security.RefreshTokenService;
 import com.quanlycuahang.erp.common.exception.BusinessRuleException;
 import com.quanlycuahang.erp.common.web.RateLimitService;
+import com.quanlycuahang.erp.system.service.SettingsService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import java.time.Duration;
@@ -33,7 +34,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AuthService {
 
-  private static final int LOGIN_RATE_LIMIT_ATTEMPTS = 5;
   private static final Duration LOGIN_RATE_LIMIT_WINDOW = Duration.ofMinutes(15);
 
   private final AuthenticationManager authenticationManager;
@@ -43,6 +43,7 @@ public class AuthService {
   private final RefreshTokenService refreshTokenService;
   private final RateLimitService rateLimitService;
   private final PasswordEncoder passwordEncoder;
+  private final SettingsService settingsService;
 
   public AuthService(
       AuthenticationManager authenticationManager,
@@ -51,7 +52,8 @@ public class AuthService {
       JwtService jwtService,
       RefreshTokenService refreshTokenService,
       RateLimitService rateLimitService,
-      PasswordEncoder passwordEncoder) {
+      PasswordEncoder passwordEncoder,
+      SettingsService settingsService) {
     this.authenticationManager = authenticationManager;
     this.userDetailsService = userDetailsService;
     this.userRepository = userRepository;
@@ -59,12 +61,15 @@ public class AuthService {
     this.refreshTokenService = refreshTokenService;
     this.rateLimitService = rateLimitService;
     this.passwordEncoder = passwordEncoder;
+    this.settingsService = settingsService;
   }
 
   public AuthTokens login(String username, String password, String clientIp) {
+    int maxAttempts =
+        Integer.parseInt(
+            settingsService.getValue(null, SettingsService.KEY_LOGIN_RATE_LIMIT_ATTEMPTS, "5"));
     boolean allowed =
-        rateLimitService.tryConsume(
-            "login:" + clientIp, LOGIN_RATE_LIMIT_ATTEMPTS, LOGIN_RATE_LIMIT_WINDOW);
+        rateLimitService.tryConsume("login:" + clientIp, maxAttempts, LOGIN_RATE_LIMIT_WINDOW);
     if (!allowed) {
       throw AuthException.rateLimitExceeded();
     }
