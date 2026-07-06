@@ -107,11 +107,13 @@ public class AuthService {
     if (storedJti == null) {
       throw AuthException.invalidRefreshToken();
     }
-    if (!storedJti.equals(jti)) {
-      // Token da rotate qua nhung van bi dung lai -> nghi ngo bi danh cap, thu hoi ca chuoi.
+    if (!storedJti.equals(jti) && !refreshTokenService.isWithinGracePeriod(tokenFamily, jti)) {
+      // Token da rotate qua VA nam ngoai khoang grace -> nghi ngo bi danh cap, thu hoi ca chuoi.
       refreshTokenService.revokeFamily(tokenFamily);
       throw AuthException.refreshTokenReuseDetected();
     }
+    // jti dang hop le, hoac nam trong khoang grace (2 refresh gan nhu dong thoi voi cung 1 token
+    // hop phap) -> cap token moi binh thuong, KHONG thu hoi chuoi.
 
     UserDetails userDetails = userDetailsService.loadUserByUsername(username);
     if (!userDetails.isEnabled()) {
