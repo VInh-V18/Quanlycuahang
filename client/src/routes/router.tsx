@@ -16,6 +16,12 @@ const ProductsPage = lazy(() =>
   import("@/pages/products/ProductsPage").then((m) => ({ default: m.ProductsPage })),
 );
 const PosPage = lazy(() => import("@/pages/pos/PosPage").then((m) => ({ default: m.PosPage })));
+const InvoicePrintPage = lazy(() =>
+  import("@/pages/invoices/InvoicePrintPage").then((m) => ({ default: m.InvoicePrintPage })),
+);
+const InvoiceLookupPage = lazy(() =>
+  import("@/pages/invoices/InvoiceLookupPage").then((m) => ({ default: m.InvoiceLookupPage })),
+);
 
 function PageFallback() {
   return (
@@ -34,6 +40,11 @@ const router = createBrowserRouter([
   {
     element: <AuthLayout />,
     children: [{ path: "/login", element: withSuspense(<LoginPage />) }],
+  },
+  {
+    // Tra cuu hoa don cong khai qua QR - khong bọc RequireAuth (khach khong dang nhap).
+    path: "/tra-cuu/:code",
+    element: withSuspense(<InvoiceLookupPage />),
   },
   {
     element: (
@@ -65,6 +76,14 @@ const router = createBrowserRouter([
         element: withSuspense(
           <RequirePermission perm="product:view">
             <ProductsPage />
+          </RequirePermission>,
+        ),
+      },
+      {
+        path: "/invoices/:id/print",
+        element: withSuspense(
+          <RequirePermission perm="invoice:view">
+            <InvoicePrintPage />
           </RequirePermission>,
         ),
       },

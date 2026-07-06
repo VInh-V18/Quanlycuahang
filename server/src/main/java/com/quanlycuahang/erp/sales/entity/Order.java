@@ -68,6 +68,12 @@ public class Order extends BaseEntity {
   @Column(name = "total_amount", nullable = false)
   private BigDecimal totalAmount = BigDecimal.ZERO;
 
+  @Column(name = "cash_received")
+  private BigDecimal cashReceived;
+
+  @Column(name = "change_amount")
+  private BigDecimal changeAmount;
+
   public String getOrderNumber() {
     return orderNumber;
   }
@@ -162,5 +168,21 @@ public class Order extends BaseEntity {
 
   public void setTotalAmount(BigDecimal totalAmount) {
     this.totalAmount = totalAmount;
+  }
+
+  public BigDecimal getCashReceived() {
+    return cashReceived;
+  }
+
+  public void setCashReceived(BigDecimal cashReceived) {
+    this.cashReceived = cashReceived;
+  }
+
+  public BigDecimal getChangeAmount() {
+    return changeAmount;
+  }
+
+  public void setChangeAmount(BigDecimal changeAmount) {
+    this.changeAmount = changeAmount;
   }
 }

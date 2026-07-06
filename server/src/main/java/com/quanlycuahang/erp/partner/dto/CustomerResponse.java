@@ -8,6 +8,7 @@ public class CustomerResponse {
   private String name;
   private String phone;
   private String address;
+  private String email;
   private Long customerGroupId;
   private BigDecimal debtLimit;
 
@@ -41,6 +42,14 @@ public class CustomerResponse {
 
   public void setAddress(String address) {
     this.address = address;
+  }
+
+  public String getEmail() {
+    return email;
+  }
+
+  public void setEmail(String email) {
+    this.email = email;
   }
 
   public Long getCustomerGroupId() {

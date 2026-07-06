@@ -30,6 +30,9 @@ public class Customer extends BaseEntity {
   @Column(name = "address")
   private String address;
 
+  @Column(name = "email")
+  private String email;
+
   @Column(name = "debt_limit", nullable = false)
   private BigDecimal debtLimit;
 
@@ -63,6 +66,14 @@ public class Customer extends BaseEntity {
 
   public void setAddress(String address) {
     this.address = address;
+  }
+
+  public String getEmail() {
+    return email;
+  }
+
+  public void setEmail(String email) {
+    this.email = email;
   }
 
   public BigDecimal getDebtLimit() {

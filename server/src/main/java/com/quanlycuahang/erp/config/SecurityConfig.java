@@ -65,6 +65,9 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/uploads/**")
                     .permitAll()
+                    .requestMatchers(
+                        org.springframework.http.HttpMethod.GET, "/api/v1/invoices/lookup/**")
+                    .permitAll()
                     .anyRequest()
                     .authenticated())
         .exceptionHandling(

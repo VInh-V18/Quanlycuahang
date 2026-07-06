@@ -1,4 +1,31 @@
-## PROJECT_STATE — sau Phase 5 — 2026-07-06
+## PROJECT_STATE — sau Phase 9 — 2026-07-06
+
+### Đã chốt (Phase 9 — Module Hóa đơn)
+- `GET /api/v1/invoices/{id}` (quyền `invoice:view`) + `GET /api/v1/invoices/lookup/{lookupCode}`
+  (công khai, khách quét QR không cần đăng nhập, an toàn IDOR vì `lookupCode` là UUID rút gọn
+  không đoán được). `InvoiceDetailAssembler` (Java thuần, cùng phong cách `OrderPricingService`)
+  gộp VAT theo từng thuế suất — verify bằng unit test "snapshot" dựng lại đúng đơn hàng thật
+  HD-000021 đã kiểm chứng ở Phase 8, khớp từng đồng.
+- Bổ sung `orders.cash_received`/`change_amount` (trước đây chỉ tính lúc tạo đơn, không lưu nên
+  không tái tạo được khi xem hóa đơn cũ), `customers.email`, setting `store_name`/`store_tax_code`
+  (migration `V4__invoice_fields.sql`).
+- Gửi email hóa đơn qua Thymeleaf + `spring-boot-starter-mail`, publish sau khi `Invoice` được lưu
+  và chỉ xử lý thật sự **sau khi transaction bán hàng commit** (`@TransactionalEventListener(phase
+  = AFTER_COMMIT)`, D4) — **verify bằng SMTP server thật** (dựng nhanh `python3 -m smtpd` debug
+  server cục bộ), xác nhận email đến đúng nội dung/đúng thời điểm (sau commit, không chặn luồng
+  bán hàng), tiếng Việt có dấu hiển thị đúng.
+- `EInvoiceProvider` (interface) + `NoOpEInvoiceProvider` (bean mặc định) — **chưa** tích hợp thật
+  với nhà cung cấp hóa đơn điện tử nào (Viettel/MISA/VNPT đều cần hợp đồng thương mại thật, không
+  thể kiểm chứng trong phiên làm việc này) — đã ghi rõ trong Javadoc cách thay thế sau.
+- FE: `InvoiceK80`/`InvoiceA4` (template in K80 80mm + A4, `@page` CSS động theo khổ đang chọn),
+  `InvoicePrintPage` (route bảo vệ, quyền `invoice:view`), `InvoiceLookupPage` (route công khai
+  `/tra-cuu/:code`, **không** bọc `RequireAuth` — khách quét QR trên hóa đơn giấy), QR code qua
+  `qrcode.react` mã hóa URL tra cứu.
+- Đã verify toàn bộ bằng ứng dụng chạy thật (Playwright + Chromium + SMTP debug thật, không chỉ
+  đọc code): email tự động gửi khi khách có email, endpoint JSON đúng/đủ (VAT breakdown khớp tổng
+  tiền), in K80 và A4 đều đúng dữ liệu, trang tra cứu công khai hoạt động từ browser context mới
+  hoàn toàn không có cookie đăng nhập, mã tra cứu sai hiện đúng lỗi tiếng Việt không crash trang.
+  Chi tiết đầy đủ: `docs/phase9/invoice-module.md`.
 
 ### Đã chốt (Phase 5 — Frontend Foundation)
 - **2 bug thật phát hiện khi verify bằng trình duyệt thật (Playwright + Chromium)** — cả hai
@@ -87,10 +114,10 @@ Quanlycuahang/
 │   │   │   ├── ui/          # 18 primitive shadcn (button, input, dialog, form, toast...)
 │   │   │   ├── layout/      # MainLayout, AuthLayout, PosLayout, Sidebar, Topbar, ThemeToggle
 │   │   │   └── common/      # DataTable, FormField, ConfirmDialog, Money, DateRangePicker, PermissionGate
-│   │   ├── pages/           # auth/LoginPage, DashboardPage, products/ProductsPage, pos/PosPage, NotFound/Forbidden
+│   │   ├── pages/           # auth/LoginPage, DashboardPage, products/ProductsPage, pos/PosPage, invoices/{Print,Lookup}Page, NotFound/Forbidden
 │   │   ├── routes/          # router.tsx, RequireAuth, RequirePermission
 │   │   ├── store/           # index.ts (Redux + persist), slices/{auth,cart,ui}Slice
-│   │   ├── lib/{http,api}/  # apiClient (refresh interceptor), queryClient, bootstrap, auth.ts, products.ts
+│   │   ├── lib/{http,api}/  # apiClient (refresh interceptor), queryClient, bootstrap, auth.ts, products.ts, invoices.ts
 │   │   └── types/           # api.ts (ApiResponse<T>), permission.ts
 │   ├── package.json, tailwind.config.ts, vite.config.ts, tsconfig*.json
 │   └── *.test.ts(x)         # Vitest — utils, jwt decode, Money (6 test)
@@ -110,17 +137,20 @@ Quanlycuahang/
 │       │   │   ├── partner/entity/       # CustomerGroup, Customer, Supplier, Debt, DebtPayment
 │       │   │   ├── sales/{entity,service,controller,dto,pricing,statemachine,repository,web}/  # Order, ParkedOrder, Return, OrderPricingService, IdempotencyInterceptor...
 │       │   │   ├── promotion/{entity,service,repository}/  # Voucher, VoucherUsage
-│       │   │   ├── operation/{entity,repository}/    # Shift, CashTransaction, InvoiceTemplate, Invoice
+│       │   │   ├── operation/{entity,repository,service,controller,dto,invoice}/  # Shift, Invoice, InvoiceDetailAssembler, EInvoiceProvider, InvoiceEmailListener
 │       │   │   └── common/sequence/NumberSequenceService.java   # SEQUENCE atomic cho order/invoice/sku
+│       │   ├── resources/templates/invoice-email.html   # Thymeleaf (Phase 9)
 │       │   └── resources/
 │       │       ├── application*.yml, logback-spring.xml
 │       │       └── db/migration/
 │       │           ├── V1__init_schema.sql        (37 bang, trigger, index, extension)
 │       │           ├── V2__seed_data.sql          (1 CN, 6 role, 51 quyen, 3 user, 5 danh muc, 30 SP, 5 KH, 3 NCC, 20 don)
-│       │           └── V3__number_sequences.sql   (order_number_seq, invoice_number_seq, sku_seq)
+│       │           ├── V3__number_sequences.sql   (order_number_seq, invoice_number_seq, sku_seq)
+│       │           └── V4__invoice_fields.sql     (orders.cash_received/change_amount, customers.email, store_name/store_tax_code)
 │       └── test/java/com/quanlycuahang/erp/
 │           ├── product/ProductRepositoryIT.java
-│           └── sales/pricing/OrderPricingServiceTest.java
+│           ├── sales/pricing/OrderPricingServiceTest.java
+│           └── operation/invoice/InvoiceDetailAssemblerTest.java
 ├── docker/                          # rỗng — cấu hình ở Phase 12
 ├── docs/
 │   ├── conventions.md, PROJECT_STATE.md
@@ -128,17 +158,18 @@ Quanlycuahang/
 │   ├── phase2/architecture.md
 │   ├── phase3/erd.md
 │   ├── phase4/  (design-tokens, layout, wireframes, pos-design, ui-states)
+│   ├── phase5/frontend-foundation.md
 │   ├── phase6/backend-foundation.md
 │   ├── phase7/product-inventory-module.md
 │   ├── phase8/pos-module.md
-│   └── phase5/frontend-foundation.md
+│   └── phase9/invoice-module.md
 ├── scripts/                         # rỗng
 ├── .env.example, .gitignore, README.md
 ```
 
 ### Database
 - Bảng đã có: đủ 37 bảng (xem `docs/phase3/erd.md` mục 4)
-- Migration Flyway mới nhất: `V3__number_sequences.sql`
+- Migration Flyway mới nhất: `V4__invoice_fields.sql`
 - Extension: `unaccent`, `pg_trgm`; function: `immutable_unaccent()`, `fn_check_inventory_stock()` + trigger; sequence: `order_number_seq`, `invoice_number_seq`, `sku_seq`
 
 ### API đã sinh
@@ -146,6 +177,7 @@ Quanlycuahang/
 - Sản phẩm/Kho: `/api/v1/products`, `/api/v1/categories`, `/api/v1/inventory`, `/api/v1/purchase-orders`, `/api/v1/stock-takes`
 - Khách hàng/Voucher: `/api/v1/customers`
 - Bán hàng POS: `POST /api/v1/orders` (header `Idempotency-Key`), `GET /api/v1/orders/{id}`, `POST /api/v1/orders/{id}/cancel`, `/api/v1/parked-orders` (list/park/resume), `POST /api/v1/returns`
+- Hóa đơn: `GET /api/v1/invoices/{id}` (quyền `invoice:view`), `GET /api/v1/invoices/lookup/{lookupCode}` (permitAll)
 - Upload: `POST /api/v1/uploads`, `GET /api/v1/uploads/{fileName}` (permitAll)
 - Actuator mặc định (`/actuator/health`, `/actuator/info`)
 - **Nợ**: chưa có `BranchController` (CRUD chi nhánh) — hiện chỉ có `BranchRepository`, dùng nội bộ trong `OrderService`/`SettingsService`; cần bổ sung nếu FE cần màn quản lý chi nhánh
@@ -158,6 +190,8 @@ Quanlycuahang/
   (`DataTable` phân trang/lọc/sắp xếp với dữ liệu thật). `DashboardPage`/`PosPage` là khung/placeholder
   (số liệu và tính năng bán hàng thật thuộc phạm vi module riêng, ngoài Phase 5 Foundation).
 - Chi tiết đầy đủ + bảng verify bằng trình duyệt thật: `docs/phase5/frontend-foundation.md`.
+- (Phase 9) Bổ sung `InvoicePrintPage` (khổ K80/A4, route bảo vệ) và `InvoiceLookupPage` (route
+  công khai `/tra-cuu/:code`, không đăng nhập) + QR qua `qrcode.react` — xem `docs/phase9/invoice-module.md`.
 
 ### Nợ kỹ thuật / dang dở
 - Chưa có Dockerfile/docker-compose.yml — Phase 12
@@ -170,6 +204,13 @@ Quanlycuahang/
 - `DataTable` sắp xếp mới hoạt động phía client (trang hiện tại) cho `/products` vì native query Phase 7 có `ORDER BY` cố định, chưa nhận `Pageable.getSort()` động — xem `docs/phase5/frontend-foundation.md` để biết cách chuyển sang `JpaSpecificationExecutor` khi cần sắp xếp server-side thật cho từng module
 - Chưa có endpoint `/me` (thông tin user hiện tại) — FE giải mã payload JWT (`sub`, `authorities`) để lấy username/quyền hiển thị UI, `fullName` tạm dùng lại `username` vì token không có trường này; nên bổ sung `/me` nếu cần hiển thị đầy đủ hồ sơ nhân viên
 - Các trang nghiệp vụ FE (CRUD sản phẩm/khách hàng/kho, giỏ hàng POS thật, báo cáo...) chưa xây — Phase 5 chỉ là "Foundation" (scaffold + hạ tầng + component nền) đúng phạm vi master prompt, không phải toàn bộ giao diện
+- `EInvoiceProvider` mới có `NoOpEInvoiceProvider` (bean mặc định, không gửi đi đâu) — chưa tích hợp thật với Viettel S-Invoice/MISA/VNPT (cần hợp đồng thương mại thật, ngoài khả năng phiên làm việc này); xem Javadoc `EInvoiceProvider` để biết cách thay thế khi có nhà cung cấp thật
+- Email hóa đơn mới verify bằng SMTP debug server cục bộ (`python3 -m smtpd`), chưa test với SMTP thật (Gmail/SES/SendGrid...) — cần kiểm tra lại cấu hình `spring.mail.properties.mail.smtp.starttls`/`auth` khi triển khai thật với nhà cung cấp SMTP yêu cầu STARTTLS/xác thực
+
+### Tự đánh giá Phase 9
+- **Mạnh**: verify bằng cả ứng dụng thật (Playwright + Chromium) lẫn hạ tầng ngoài thật (SMTP debug server thật, không mock) — xác nhận đúng thứ tự event (gửi email SAU commit, không chặn luồng bán hàng), nội dung email/JSON/2 khổ in đều khớp dữ liệu gốc từng đồng; unit test "snapshot" tái sử dụng đúng số liệu đơn hàng thật đã verify ở Phase 8 thay vì bịa dữ liệu mới, tăng độ tin cậy liên phase.
+- **Thiếu**: chưa tích hợp `EInvoiceProvider` thật (đã ghi nợ rõ ràng, không thể làm được trong phạm vi phiên này); chưa xuất PDF lưu server (chỉ in trình duyệt qua `window.print()`, đúng khuyến nghị "ưu tiên in trình duyệt" của master prompt nhưng chưa có phương án lưu file phía server nếu cần).
+- **Rủi ro**: trang tra cứu công khai (`/tra-cuu/:code`) lộ `customerPhone`/`customerEmail` cho bất kỳ ai có `lookupCode` — chấp nhận được vì hóa đơn giấy vật lý vốn đã có các thông tin này, nhưng cần cân nhắc lại nếu sau này có yêu cầu ẩn bớt thông tin nhạy cảm trên bản tra cứu công khai.
 
 ### Tự đánh giá Phase 5
 - **Mạnh**: verify bằng Playwright + Chromium thật (không chỉ đọc code hay chỉ chạy Vitest) — phát hiện 2 bug thật (cookie Secure chặn refresh ở dev local, CORS origin 127.0.0.1 vs localhost) mà chỉ hiện ra khi trình duyệt thật áp dụng đúng chính sách cookie/CORS, curl không bao giờ phát hiện được; DataTable/routing/theme/auth đều test qua thao tác thật trên UI, có ảnh chụp màn hình đối chiếu.
@@ -192,10 +233,9 @@ Quanlycuahang/
 - **Rủi ro**: `ProductRepositoryIT` chưa được CI thực thi trong phiên làm việc này do thiếu Docker — cần chạy xác nhận trên môi trường có Docker trước khi merge.
 
 ### Kế tiếp
-Phase 1–8 của master prompt đã hoàn tất (0 Khởi tạo, 1 Nghiệp vụ, 2 Kiến trúc, 3 Database,
-4 Thiết kế giao diện, 5 Frontend Foundation, 6 Backend Foundation, 7 Sản phẩm & Kho, 8 Bán hàng
-POS). Phase tiếp theo chưa được yêu cầu thực hiện:
-- Phase 9: Module Hóa đơn (endpoint JSON hóa đơn đầy đủ + template in K80/A4 FE + gửi email)
+Phase 0–9 của master prompt đã hoàn tất (Khởi tạo, Nghiệp vụ, Kiến trúc, Database, Thiết kế giao
+diện, Frontend Foundation, Backend Foundation, Sản phẩm & Kho, Bán hàng POS, Hóa đơn). Phase tiếp
+theo chưa được yêu cầu thực hiện:
 - Phase 10: Báo cáo (doanh thu/lợi nhuận gộp/tồn kho/công nợ, xuất Excel)
 - Phase 11: Testing (unit đầy đủ OrderPricingService ≥20 case, Testcontainers integration, Playwright E2E chính thức)
 - Phase 12: DevOps & tài liệu (Docker Compose, CI, README vận hành)

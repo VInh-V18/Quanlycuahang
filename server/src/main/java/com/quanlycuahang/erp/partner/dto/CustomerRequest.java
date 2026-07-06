@@ -1,6 +1,7 @@
 package com.quanlycuahang.erp.partner.dto;
 
 import com.quanlycuahang.erp.common.validation.ValidPhoneVN;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import java.math.BigDecimal;
 
@@ -11,6 +12,8 @@ public class CustomerRequest {
   @ValidPhoneVN private String phone;
 
   private String address;
+
+  @Email private String email;
 
   private Long customerGroupId;
 
@@ -38,6 +41,14 @@ public class CustomerRequest {
 
   public void setAddress(String address) {
     this.address = address;
+  }
+
+  public String getEmail() {
+    return email;
+  }
+
+  public void setEmail(String email) {
+    this.email = email;
   }
 
   public Long getCustomerGroupId() {

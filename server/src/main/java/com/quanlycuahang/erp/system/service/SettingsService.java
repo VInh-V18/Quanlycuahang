@@ -27,6 +27,8 @@ public class SettingsService {
   public static final String KEY_SKU_PREFIX = "sku_prefix";
   public static final String KEY_ORDER_NUMBER_PREFIX = "order_number_prefix";
   public static final String KEY_INVOICE_NUMBER_PREFIX = "invoice_number_prefix";
+  public static final String KEY_STORE_NAME = "store_name";
+  public static final String KEY_STORE_TAX_CODE = "store_tax_code";
 
   private final SettingsRepository settingsRepository;
   private final BranchRepository branchRepository;

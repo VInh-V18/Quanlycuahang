@@ -11,6 +11,7 @@ import com.quanlycuahang.erp.inventory.repository.InventoryRepository;
 import com.quanlycuahang.erp.inventory.repository.InventoryTransactionRepository;
 import com.quanlycuahang.erp.operation.entity.Invoice;
 import com.quanlycuahang.erp.operation.entity.Shift;
+import com.quanlycuahang.erp.operation.invoice.InvoiceCreatedEvent;
 import com.quanlycuahang.erp.operation.repository.InvoiceRepository;
 import com.quanlycuahang.erp.operation.repository.ShiftRepository;
 import com.quanlycuahang.erp.partner.entity.Customer;
@@ -48,6 +49,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -76,6 +78,7 @@ public class OrderService {
   private final CurrentUserProvider currentUserProvider;
   private final IdempotencyService idempotencyService;
   private final NumberSequenceService numberSequenceService;
+  private final ApplicationEventPublisher eventPublisher;
 
   public OrderService(
       OrderRepository orderRepository,
@@ -94,7 +97,8 @@ public class OrderService {
       SettingsService settingsService,
       CurrentUserProvider currentUserProvider,
       IdempotencyService idempotencyService,
-      NumberSequenceService numberSequenceService) {
+      NumberSequenceService numberSequenceService,
+      ApplicationEventPublisher eventPublisher) {
     this.orderRepository = orderRepository;
     this.orderItemRepository = orderItemRepository;
     this.orderPaymentRepository = orderPaymentRepository;
@@ -112,6 +116,7 @@ public class OrderService {
     this.currentUserProvider = currentUserProvider;
     this.idempotencyService = idempotencyService;
     this.numberSequenceService = numberSequenceService;
+    this.eventPublisher = eventPublisher;
   }
 
   @Transactional
@@ -235,6 +240,8 @@ public class OrderService {
     order.setVatAmount(pricing.getVatAmount());
     order.setRoundingAdjustment(pricing.getRoundingAdjustment());
     order.setTotalAmount(pricing.getTotalAmount());
+    order.setCashReceived(request.getCashReceived());
+    order.setChangeAmount(pricing.getChangeAmount());
     currentUserProvider.getCurrentUser().ifPresent(order::setCashier);
     order = orderRepository.save(order);
 
@@ -330,6 +337,7 @@ public class OrderService {
               pricing.getTotalAmount(), "Thanh toan " + order.getOrderNumber()));
     }
     invoice = invoiceRepository.save(invoice);
+    eventPublisher.publishEvent(new InvoiceCreatedEvent(invoice.getId()));
 
     OrderResponse response = new OrderResponse();
     response.setId(order.getId());

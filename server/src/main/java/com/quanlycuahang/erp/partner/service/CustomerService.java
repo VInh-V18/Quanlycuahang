@@ -70,6 +70,7 @@ public class CustomerService {
     customer.setName(request.getName());
     customer.setPhone(request.getPhone());
     customer.setAddress(request.getAddress());
+    customer.setEmail(request.getEmail());
     customer.setDebtLimit(request.getDebtLimit());
     if (request.getCustomerGroupId() != null) {
       CustomerGroup group =
