@@ -15,6 +15,7 @@ import {
   type ParkedOrder,
 } from "@/lib/api/parkedOrders";
 import { searchProducts, type Product } from "@/lib/api/products";
+import { getCurrentShift } from "@/lib/api/shifts";
 import { validateVoucher, type VoucherPreview } from "@/lib/api/vouchers";
 import { CURRENT_BRANCH_ID } from "@/lib/constants";
 import { getApiErrorMessage } from "@/lib/http/errors";
@@ -189,6 +190,8 @@ export function PosPage() {
     },
   });
 
+  const currentShiftQuery = useQuery({ queryKey: ["shifts", "current"], queryFn: getCurrentShift });
+
   const checkoutMutation = useMutation({
     mutationFn: () => {
       const payments =
@@ -199,6 +202,7 @@ export function PosPage() {
         {
           branchId: CURRENT_BRANCH_ID,
           customerId: customer?.id,
+          shiftId: currentShiftQuery.data?.id,
           voucherCode: appliedVoucher?.code,
           orderDiscountAmount,
           cashReceived: paymentMethod === "cash" ? cashReceived : undefined,
@@ -217,6 +221,7 @@ export function PosPage() {
       toast({ title: `Đã thanh toán đơn ${order.orderNumber}` });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["shifts"] });
       if (order.invoiceId) {
         window.open(`/invoices/${order.invoiceId}/print`, "_blank");
       }

@@ -60,6 +60,9 @@ const DebtsPage = lazy(() =>
 const EmployeesPage = lazy(() =>
   import("@/pages/employees/EmployeesPage").then((m) => ({ default: m.EmployeesPage })),
 );
+const ShiftsPage = lazy(() =>
+  import("@/pages/shifts/ShiftsPage").then((m) => ({ default: m.ShiftsPage })),
+);
 const PosPage = lazy(() => import("@/pages/pos/PosPage").then((m) => ({ default: m.PosPage })));
 const InvoicePrintPage = lazy(() =>
   import("@/pages/invoices/InvoicePrintPage").then((m) => ({ default: m.InvoicePrintPage })),
@@ -244,6 +247,14 @@ const router = createBrowserRouter([
         element: withSuspense(
           <RequirePermission perm="employee:view">
             <EmployeesPage />
+          </RequirePermission>,
+        ),
+      },
+      {
+        path: "/shifts",
+        element: withSuspense(
+          <RequirePermission perm="shift:view">
+            <ShiftsPage />
           </RequirePermission>,
         ),
       },

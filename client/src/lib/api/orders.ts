@@ -89,6 +89,7 @@ export interface OrderCreatePayment {
 export interface OrderCreateRequest {
   branchId: number;
   customerId?: number;
+  shiftId?: number;
   voucherCode?: string;
   orderDiscountAmount: number;
   cashReceived?: number;

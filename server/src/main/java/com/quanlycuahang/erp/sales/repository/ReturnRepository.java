@@ -38,4 +38,21 @@ public interface ReturnRepository extends JpaRepository<Return, Long> {
       @Param("from") OffsetDateTime from,
       @Param("to") OffsetDateTime to,
       @Param("branchId") Long branchId);
+
+  /**
+   * Tong tien hoan bang tien mat trong khoang thoi gian 1 ca lam viec — returns khong co shift_id
+   * rieng (Phase 9) nen doi chieu theo cua so thoi gian [openedAt, closedAt-hoac-now) cua ca, dung
+   * cho tinh "tien mat thuc te du kien" khi dong ca (FH-14).
+   */
+  @Query(
+      value =
+          "SELECT COALESCE(SUM(r.total_refund), 0) "
+              + "FROM returns r JOIN orders o ON o.id = r.order_id "
+              + "WHERE r.refund_method = 'cash' AND o.branch_id = :branchId "
+              + "AND r.created_at >= :from AND r.created_at < :to",
+      nativeQuery = true)
+  BigDecimal sumCashRefundsInWindow(
+      @Param("branchId") Long branchId,
+      @Param("from") OffsetDateTime from,
+      @Param("to") OffsetDateTime to);
 }

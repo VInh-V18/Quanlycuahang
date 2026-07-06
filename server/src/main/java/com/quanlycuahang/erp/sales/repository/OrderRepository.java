@@ -22,6 +22,8 @@ public interface OrderRepository
 
   Page<Order> findByBranchIdOrderByCreatedAtDesc(Long branchId, Pageable pageable);
 
+  long countByShiftId(Long shiftId);
+
   /**
    * Doanh thu nhom theo ngay/tuan/thang (:unit = 'day'|'week'|'month') — quy ve gio dia phuong
    * Asia/Ho_Chi_Minh truoc khi cat, tranh lech ngay so voi UTC luu trong DB (Phase 10).
