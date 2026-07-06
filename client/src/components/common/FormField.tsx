@@ -17,6 +17,7 @@ export interface FormFieldProps<TFieldValues extends FieldValues> {
   type?: string;
   placeholder?: string;
   disabled?: boolean;
+  required?: boolean;
 }
 
 /** Wrapper gọn cho trường hợp phổ biến nhất: 1 Label + 1 Input text + thông báo lỗi Zod
@@ -30,6 +31,7 @@ export function FormField<TFieldValues extends FieldValues>({
   type = "text",
   placeholder,
   disabled,
+  required,
 }: FormFieldProps<TFieldValues>) {
   return (
     <RHFFormField
@@ -37,7 +39,10 @@ export function FormField<TFieldValues extends FieldValues>({
       name={name}
       render={({ field }) => (
         <FormItem>
-          <FormLabel>{label}</FormLabel>
+          <FormLabel>
+            {label}
+            {required && <span className="text-destructive"> *</span>}
+          </FormLabel>
           <FormControl>
             <Input type={type} placeholder={placeholder} disabled={disabled} {...field} />
           </FormControl>
