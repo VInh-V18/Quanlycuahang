@@ -128,6 +128,8 @@ public class ProductService {
     product.setMinStock(request.getMinStock());
     product.setImageUrl(request.getImageUrl());
     product.setBarcode(request.getBarcode());
+    product.setOriginCountry(request.getOriginCountry());
+    product.setOriginRegion(request.getOriginRegion());
     if (request.getCategoryId() != null) {
       Category category =
           categoryRepository

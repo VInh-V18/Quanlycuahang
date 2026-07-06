@@ -17,6 +17,8 @@ export interface LowStockItem {
   stock: number;
   costPrice: number;
   minStock: number;
+  nearestBatchCode: string | null;
+  nearestExpiryDate: string | null;
 }
 
 export interface DashboardSummary {

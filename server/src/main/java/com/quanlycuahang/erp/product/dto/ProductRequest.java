@@ -28,6 +28,10 @@ public class ProductRequest {
 
   private String imageUrl;
 
+  private String originCountry;
+
+  private String originRegion;
+
   public Long getCategoryId() {
     return categoryId;
   }
@@ -106,5 +110,21 @@ public class ProductRequest {
 
   public void setImageUrl(String imageUrl) {
     this.imageUrl = imageUrl;
+  }
+
+  public String getOriginCountry() {
+    return originCountry;
+  }
+
+  public void setOriginCountry(String originCountry) {
+    this.originCountry = originCountry;
+  }
+
+  public String getOriginRegion() {
+    return originRegion;
+  }
+
+  public void setOriginRegion(String originRegion) {
+    this.originRegion = originRegion;
   }
 }

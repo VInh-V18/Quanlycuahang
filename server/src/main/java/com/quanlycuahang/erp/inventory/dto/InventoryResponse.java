@@ -1,6 +1,7 @@
 package com.quanlycuahang.erp.inventory.dto;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 public class InventoryResponse {
 
@@ -11,6 +12,11 @@ public class InventoryResponse {
   private BigDecimal stock;
   private BigDecimal costPrice;
   private BigDecimal minStock;
+
+  /** Lo/HSD gan nhat con hieu luc (FH-4) — null neu san pham chua tung nhap kem lo/HSD. */
+  private String nearestBatchCode;
+
+  private LocalDate nearestExpiryDate;
 
   public Long getId() {
     return id;
@@ -66,5 +72,21 @@ public class InventoryResponse {
 
   public void setMinStock(BigDecimal minStock) {
     this.minStock = minStock;
+  }
+
+  public String getNearestBatchCode() {
+    return nearestBatchCode;
+  }
+
+  public void setNearestBatchCode(String nearestBatchCode) {
+    this.nearestBatchCode = nearestBatchCode;
+  }
+
+  public LocalDate getNearestExpiryDate() {
+    return nearestExpiryDate;
+  }
+
+  public void setNearestExpiryDate(LocalDate nearestExpiryDate) {
+    this.nearestExpiryDate = nearestExpiryDate;
   }
 }

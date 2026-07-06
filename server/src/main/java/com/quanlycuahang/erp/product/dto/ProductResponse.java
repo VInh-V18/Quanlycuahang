@@ -17,6 +17,8 @@ public class ProductResponse {
   private BigDecimal minStock;
   private String imageUrl;
   private boolean active;
+  private String originCountry;
+  private String originRegion;
 
   public Long getId() {
     return id;
@@ -120,5 +122,21 @@ public class ProductResponse {
 
   public void setActive(boolean active) {
     this.active = active;
+  }
+
+  public String getOriginCountry() {
+    return originCountry;
+  }
+
+  public void setOriginCountry(String originCountry) {
+    this.originCountry = originCountry;
+  }
+
+  public String getOriginRegion() {
+    return originRegion;
+  }
+
+  public void setOriginRegion(String originRegion) {
+    this.originRegion = originRegion;
   }
 }

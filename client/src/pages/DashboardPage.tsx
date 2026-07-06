@@ -24,6 +24,11 @@ function formatToday(): string {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
+function formatDate(isoDate: string): string {
+  const [year, month, day] = isoDate.split("-");
+  return `${day}/${month}/${year}`;
+}
+
 function KpiDelta({ value, suffix }: { value: number; suffix: string }) {
   const positive = value >= 0;
   return (
@@ -59,6 +64,19 @@ export function DashboardPage() {
     { key: "productName", header: "Sản phẩm" },
     { key: "sku", header: "SKU" },
     { key: "stock", header: "Tồn", className: "text-right" },
+    {
+      key: "nearestBatchCode",
+      header: "Lô / HSD",
+      render: (row) =>
+        row.nearestBatchCode ? (
+          <span>
+            {row.nearestBatchCode}
+            {row.nearestExpiryDate && ` · HSD ${formatDate(row.nearestExpiryDate)}`}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
   ];
 
   const recentOrderColumns: DataTableColumn<RecentOrder>[] = [

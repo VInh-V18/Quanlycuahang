@@ -7,10 +7,12 @@ import com.quanlycuahang.erp.inventory.dto.PurchaseOrderItemRequest;
 import com.quanlycuahang.erp.inventory.dto.PurchaseOrderRequest;
 import com.quanlycuahang.erp.inventory.dto.PurchaseOrderResponse;
 import com.quanlycuahang.erp.inventory.entity.Inventory;
+import com.quanlycuahang.erp.inventory.entity.InventoryBatch;
 import com.quanlycuahang.erp.inventory.entity.InventoryTransaction;
 import com.quanlycuahang.erp.inventory.entity.PurchaseOrder;
 import com.quanlycuahang.erp.inventory.entity.PurchaseOrderItem;
 import com.quanlycuahang.erp.inventory.mapper.PurchaseOrderMapper;
+import com.quanlycuahang.erp.inventory.repository.InventoryBatchRepository;
 import com.quanlycuahang.erp.inventory.repository.InventoryRepository;
 import com.quanlycuahang.erp.inventory.repository.InventoryTransactionRepository;
 import com.quanlycuahang.erp.inventory.repository.PurchaseOrderItemRepository;
@@ -42,6 +44,7 @@ public class PurchaseOrderService {
   private final PurchaseOrderItemRepository purchaseOrderItemRepository;
   private final InventoryRepository inventoryRepository;
   private final InventoryTransactionRepository inventoryTransactionRepository;
+  private final InventoryBatchRepository inventoryBatchRepository;
   private final SupplierRepository supplierRepository;
   private final BranchRepository branchRepository;
   private final ProductRepository productRepository;
@@ -54,6 +57,7 @@ public class PurchaseOrderService {
       PurchaseOrderItemRepository purchaseOrderItemRepository,
       InventoryRepository inventoryRepository,
       InventoryTransactionRepository inventoryTransactionRepository,
+      InventoryBatchRepository inventoryBatchRepository,
       SupplierRepository supplierRepository,
       BranchRepository branchRepository,
       ProductRepository productRepository,
@@ -64,6 +68,7 @@ public class PurchaseOrderService {
     this.purchaseOrderItemRepository = purchaseOrderItemRepository;
     this.inventoryRepository = inventoryRepository;
     this.inventoryTransactionRepository = inventoryTransactionRepository;
+    this.inventoryBatchRepository = inventoryBatchRepository;
     this.supplierRepository = supplierRepository;
     this.branchRepository = branchRepository;
     this.productRepository = productRepository;
@@ -128,7 +133,20 @@ public class PurchaseOrderService {
       item.setProduct(product);
       item.setQuantity(itemRequest.getQuantity());
       item.setUnitPrice(itemRequest.getUnitPrice());
-      savedItems.add(purchaseOrderItemRepository.save(item));
+      item = purchaseOrderItemRepository.save(item);
+      savedItems.add(item);
+
+      if (itemRequest.getBatchCode() != null && !itemRequest.getBatchCode().isBlank()) {
+        InventoryBatch batch = new InventoryBatch();
+        batch.setProduct(product);
+        batch.setBranch(branch);
+        batch.setPurchaseOrderItem(item);
+        batch.setBatchCode(itemRequest.getBatchCode());
+        batch.setExpiryDate(itemRequest.getExpiryDate());
+        batch.setQuantity(itemRequest.getQuantity());
+        batch.setCostPrice(itemRequest.getUnitPrice());
+        inventoryBatchRepository.save(batch);
+      }
 
       InventoryTransaction transaction = new InventoryTransaction();
       transaction.setProduct(product);

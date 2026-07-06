@@ -55,6 +55,12 @@ public class Product extends BaseEntity {
   @Column(name = "is_active", nullable = false)
   private boolean active = true;
 
+  @Column(name = "origin_country")
+  private String originCountry;
+
+  @Column(name = "origin_region")
+  private String originRegion;
+
   public Category getCategory() {
     return category;
   }
@@ -141,5 +147,21 @@ public class Product extends BaseEntity {
 
   public void setActive(boolean active) {
     this.active = active;
+  }
+
+  public String getOriginCountry() {
+    return originCountry;
+  }
+
+  public void setOriginCountry(String originCountry) {
+    this.originCountry = originCountry;
+  }
+
+  public String getOriginRegion() {
+    return originRegion;
+  }
+
+  public void setOriginRegion(String originRegion) {
+    this.originRegion = originRegion;
   }
 }
