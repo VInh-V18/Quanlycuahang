@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8" />
+  <title th:text="'Hoa don ' + ${invoice.invoiceNumber}">Hoa don</title>
+</head>
+<body style="font-family: Arial, sans-serif; color: #0F172A; max-width: 600px; margin: 0 auto;">
+  <h2 th:text="${invoice.storeName}">Ten cua hang</h2>
+  <p style="color: #64748B; margin-top: -8px;">
+    <span th:text="${invoice.branchName}">Chi nhanh</span> —
+    <span th:text="${invoice.branchAddress}">Dia chi</span> —
+    <span th:text="${invoice.branchPhone}">SDT</span>
+  </p>
+
+  <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px;">
+    <tr>
+      <td>Số hóa đơn</td>
+      <td style="text-align: right; font-weight: bold" th:text="${invoice.invoiceNumber}">INV-000001</td>
+    </tr>
+    <tr>
+      <td>Mã đơn hàng</td>
+      <td style="text-align: right" th:text="${invoice.orderNumber}">HD-000001</td>
+    </tr>
+    <tr>
+      <td>Thu ngân</td>
+      <td style="text-align: right" th:text="${invoice.cashierName}">Nguyen Van A</td>
+    </tr>
+  </table>
+
+  <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px;">
+    <thead>
+      <tr style="border-bottom: 1px solid #E2E8F0; text-align: left;">
+        <th>Sản phẩm</th>
+        <th style="text-align: right;">SL</th>
+        <th style="text-align: right;">Đơn giá</th>
+        <th style="text-align: right;">Thành tiền</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr th:each="line : ${invoice.lines}" style="border-bottom: 1px solid #F1F5F9;">
+        <td th:text="${line.productName}">Sản phẩm</td>
+        <td style="text-align: right" th:text="${line.quantity}">1</td>
+        <td style="text-align: right" th:text="${#numbers.formatInteger(line.unitPrice, 1, 'POINT')}">0</td>
+        <td style="text-align: right" th:text="${#numbers.formatInteger(line.lineTotal, 1, 'POINT')}">0</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <table style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td>Tổng hàng</td>
+      <td style="text-align: right" th:text="${#numbers.formatInteger(invoice.subtotalAmount, 1, 'POINT')} + ' đ'">0 đ</td>
+    </tr>
+    <tr>
+      <td>Chiết khấu</td>
+      <td style="text-align: right" th:text="${#numbers.formatInteger(invoice.discountAmount, 1, 'POINT')} + ' đ'">0 đ</td>
+    </tr>
+    <tr th:each="vat : ${invoice.vatBreakdown}">
+      <td th:text="'VAT ' + ${vat.vatRate} + '%'">VAT</td>
+      <td style="text-align: right" th:text="${#numbers.formatInteger(vat.vatAmount, 1, 'POINT')} + ' đ'">0 đ</td>
+    </tr>
+    <tr style="font-weight: bold; font-size: 1.1em;">
+      <td>Tổng thanh toán</td>
+      <td style="text-align: right" th:text="${#numbers.formatInteger(invoice.totalAmount, 1, 'POINT')} + ' đ'">0 đ</td>
+    </tr>
+    <tr th:if="${invoice.changeAmount != null}">
+      <td>Tiền thừa</td>
+      <td style="text-align: right" th:text="${#numbers.formatInteger(invoice.changeAmount, 1, 'POINT')} + ' đ'">0 đ</td>
+    </tr>
+  </table>
+
+  <p style="color: #94A3B8; font-size: 0.85em; margin-top: 24px;">
+    Mã tra cứu: <span th:text="${invoice.lookupCode}">ABCD1234</span> — Cảm ơn quý khách đã mua hàng!
+  </p>
+</body>
+</html>

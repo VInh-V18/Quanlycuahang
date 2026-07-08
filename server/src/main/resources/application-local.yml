@@ -1,0 +1,25 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:quanlycuahang}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+  jpa:
+    show-sql: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:local-dev-secret-change-me-in-real-environments-only}
+  cors:
+    allowed-origins: http://localhost:5173
+  auth:
+    # Cookie Secure yeu cau HTTPS — dev local chay http://localhost nen phai tat,
+    # neu khong trinh duyet se tu choi luu cookie refresh token (RFC 6265).
+    refresh-cookie-secure: false
+
+logging:
+  level:
+    com.quanlycuahang.erp: DEBUG

@@ -1,0 +1,27 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:quanlycuahang}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    show-sql: false
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost}
+  auth:
+    # true (mac dinh) cho kich ban VPS co HTTPS truoc container web; dat false qua .env cho kich
+    # ban LAN noi bo chi co HTTP, neu khong trinh duyet se tu choi luu cookie refresh token
+    # (RFC 6265 — Secure cookie yeu cau ket noi HTTPS).
+    refresh-cookie-secure: ${AUTH_REFRESH_COOKIE_SECURE:true}
+
+logging:
+  level:
+    com.quanlycuahang.erp: INFO
