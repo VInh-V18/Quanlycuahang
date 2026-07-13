@@ -58,7 +58,12 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class AiAssistantController {
 
   private static final Logger log = LoggerFactory.getLogger(AiAssistantController.class);
-  private static final long SSE_TIMEOUT_MILLIS = 40_000L;
+  // 150s - PHAI lon hon timeout rieng cua CA 2 provider (Claude 30s, Ollama 120s - xem
+  // application.yml) de provider tu bao loi ro rang truoc (AI_PROVIDER_TIMEOUT) thay vi SseEmitter
+  // cat ngang truoc. Gia tri cu (40s) DA DUOC DO THAT la qua sat cho Ollama tren phan cung khong
+  // GPU (1 lan hoi co tool + tong hop cau tra loi dai co the toi ~45-60s KE CA khi model da "am",
+  // xem PROJECT_STATE.md) - cat ngang giua chung 1 cau tra loi dang tot la trai nghiem te hon.
+  private static final long SSE_TIMEOUT_MILLIS = 150_000L;
 
   private final AiAssistantService aiAssistantService;
   private final AiConversationMemoryService conversationMemoryService;

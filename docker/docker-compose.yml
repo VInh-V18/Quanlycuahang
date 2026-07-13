@@ -97,6 +97,45 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
+  # Prompt #12 (nang cap) - model AI tu host qua Ollama, thay the API dam may Anthropic khi
+  # AI_PROVIDER_TYPE=ollama trong .env (xem OllamaAiProvider) - mien phi, khong gui du lieu ra
+  # ngoai, nhung can RAM rieng cho model (xem gioi han memory duoi day). KHONG publish port 11434
+  # ra host (chi server goi qua ten container trong docker network noi bo), KHONG khai bao
+  # depends_on tu "server" (tuong tu ml-service - AI chi dap ung loi nhe nhang neu Ollama chua san
+  # sang/chua pull model, khong lam cham hay chan server khoi dong).
+  #
+  # BAT BUOC lam 1 LAN sau khi container nay chay lan dau (Ollama khong tu dong tai model):
+  #   docker exec <ten-container-ollama> ollama pull qwen2.5:3b
+  # (doi dung ten model neu doi AI_OLLAMA_MODEL trong .env). Xem README_DEPLOY.md muc AI de biet
+  # them chi tiet + huong dan nang cap model neu may chu co nhieu RAM/GPU hon.
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama-data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    logging: *default-logging
+    # Gioi han RAM (4GB) - phong ho may chu RAM khiem ton (vd 8GB dung chung Postgres/Redis/
+    # server/web/ml-service): neu KHONG gioi han, 1 model qua lon vo tinh duoc pull co the chiem
+    # het RAM con lai va lam CAC container KHAC (kho quan trong hon nhieu, vd Postgres) bi
+    # out-of-memory. Tang gia tri nay neu chuyen sang model lon hon qwen2.5:3b.
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+        # Bo comment 3 dong duoi neu may chu co GPU NVIDIA (can cai san nvidia-container-toolkit)
+        # de tang toc do dang ke - CHUA kiem chung tren GPU that trong moi truong phat trien nay:
+        # reservations:
+        #   devices:
+        #     - driver: nvidia
+        #       count: 1
+        #       capabilities: [gpu]
+
   web:
     build:
       context: ../client
@@ -119,3 +158,4 @@ volumes:
   postgres-data:
   redis-data:
   server-uploads:
+  ollama-data:

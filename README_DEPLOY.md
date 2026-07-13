@@ -183,31 +183,68 @@ migration đã chạy trên schema. Vì vậy:
   migration mới nào cố áp dụng lại (Flyway sẽ báo lỗi nếu schema history không khớp version đang
   chạy — dấu hiệu rollback không an toàn, đã tới bước "phải khôi phục từ backup" ở trên).
 
-## 12. Trợ lý AI (tuỳ chọn, Prompt #11)
+## 12. Trợ lý AI (tuỳ chọn, Prompt #11/#12)
 
-Tính năng "Hỏi đáp báo cáo" + "Gợi ý nhập hàng" thêm ở Prompt #11 — **tắt mặc định** cho tới khi cấu
-hình đủ 2 lớp bên dưới, không ảnh hưởng gì phần còn lại của hệ thống nếu bỏ qua mục này.
+Tính năng "Hỏi đáp báo cáo" + "AI giải thích" + "Gợi ý nhập hàng" — **tắt mặc định** cho tới khi cấu
+hình đủ các bước bên dưới, không ảnh hưởng gì phần còn lại của hệ thống nếu bỏ qua mục này. Có
+**2 lựa chọn nhà cung cấp** (`AI_PROVIDER_TYPE` trong `.env`), chọn 1 trong 2:
 
-1. **Bắt buộc trước tiên** — đặt `AI_DB_READONLY_PASSWORD` và `AI_SETTINGS_ENCRYPTION_KEY` trong
-   `.env` (xem bảng biến môi trường ở bước 4) **trước khi** container `server` khởi động lần đầu sau
-   khi nâng cấp lên bản có Prompt #11 — migration `V30` tạo role Postgres `fruithouse_ai_readonly`
-   với đúng mật khẩu này ngay lúc chạy, đổi `.env` SAU đó sẽ không tự cập nhật lại mật khẩu role đã
-   tạo (phải tự `ALTER ROLE fruithouse_ai_readonly WITH PASSWORD '...'` tay nếu cần đổi).
-2. Đăng nhập bằng tài khoản **chủ cửa hàng** (owner), vào **Cài đặt → Trợ lý AI**, nhập khoá API của
-   nhà cung cấp AI (mặc định Claude, xem `AI_DEFAULT_MODEL`) — khoá được mã hoá (AES-256-GCM) bằng
-   `AI_SETTINGS_ENCRYPTION_KEY` trước khi lưu vào database, không bao giờ lưu dạng thường.
-3. Tính năng "Gợi ý nhập hàng" (nút **Gợi ý từ AI** ở trang Tạo phiếu nhập) hoạt động ngay cả khi
-   CHƯA cấu hình khoá API ở bước 2 — đây là công thức tính toán xác định (tốc độ bán 30 ngày × định
-   mức tồn tối thiểu), không gọi AI/LLM, xem Javadoc `AiPurchaseSuggestionService`. Chỉ tính năng
-   "Hỏi đáp báo cáo" (widget trên Dashboard) mới cần khoá API thật.
+### 12a. Bắt buộc chung cho cả 2 lựa chọn
 
-**Cảnh báo chưa kiểm chứng**: `ClaudeAiProvider` (tích hợp Anthropic Messages API) được viết đúng
-theo tài liệu chính thức tại thời điểm viết code nhưng **CHƯA được gọi thử với 1 khoá API thật**
-(không có sẵn trong môi trường phát triển, giống tình trạng `EInvoiceProvider` trước đây) — lớp an
-toàn kết nối DB (role chỉ-đọc, 4 view whitelist) đã được kiểm chứng đầy đủ qua
-`AiReadOnlyPermissionIT`, nhưng bản thân lời gọi HTTP tới Anthropic thì chưa. Trước khi bật tính năng
-"Hỏi đáp báo cáo" cho 1 tenant thật, nên tự thử 1 câu hỏi với khoá API thật và xác nhận câu trả lời
-hợp lý trước khi thông báo tính năng này cho người dùng cuối.
+Đặt `AI_DB_READONLY_PASSWORD` trong `.env` **trước khi** container `server` khởi động lần đầu sau
+khi nâng cấp lên bản có Prompt #11 — migration `V30` tạo role Postgres `fruithouse_ai_readonly` với
+đúng mật khẩu này ngay lúc chạy, đổi `.env` SAU đó sẽ không tự cập nhật lại mật khẩu role đã tạo
+(phải tự `ALTER ROLE fruithouse_ai_readonly WITH PASSWORD '...'` tay nếu cần đổi). Tính năng "Gợi ý
+nhập hàng" cơ bản (nút **Gợi ý từ AI**) hoạt động ngay cả khi KHÔNG cấu hình gì thêm — đây là công
+thức tính toán xác định, không gọi AI/LLM, xem Javadoc `AiPurchaseSuggestionService`.
+
+### 12b. Lựa chọn A — `AI_PROVIDER_TYPE=claude` (API đám mây, trả phí theo token)
+
+1. Đặt `AI_SETTINGS_ENCRYPTION_KEY` trong `.env` (32 byte, base64, sinh bằng `openssl rand -base64
+   32`).
+2. Đăng nhập bằng tài khoản **chủ cửa hàng** (owner), vào **Cài đặt → Trợ lý AI**, nhập khoá API
+   Anthropic — khoá được mã hoá (AES-256-GCM) bằng `AI_SETTINGS_ENCRYPTION_KEY` trước khi lưu vào
+   database, không bao giờ lưu dạng thường.
+
+**Cảnh báo chưa kiểm chứng**: `ClaudeAiProvider` được viết đúng theo tài liệu chính thức tại thời
+điểm viết code nhưng **CHƯA được gọi thử với 1 khoá API thật** (không có sẵn trong môi trường phát
+triển, giống tình trạng `EInvoiceProvider` trước đây). Trước khi bật cho tenant thật, nên tự thử 1
+câu hỏi và xác nhận câu trả lời hợp lý.
+
+### 12c. Lựa chọn B — `AI_PROVIDER_TYPE=ollama` (tự host trên chính máy chủ, miễn phí)
+
+Chạy model mã nguồn mở (mặc định `qwen2.5:3b`) trực tiếp trên máy chủ qua container `ollama` mới
+(xem `docker-compose.yml`) — **không cần khoá API, không tốn phí theo token, dữ liệu không rời khỏi
+máy chủ**, nhưng đổi lại: chậm hơn đáng kể so với Claude nếu máy chủ không có GPU (có thể 10–60
+giây/câu trả lời tuỳ cấu hình), và chất lượng trả lời của model nhỏ (3B tham số) không bằng model
+đám mây chuyên dụng.
+
+1. Đặt `AI_PROVIDER_TYPE=ollama` trong `.env` (không cần `AI_SETTINGS_ENCRYPTION_KEY`/khoá API —
+   không dùng cơ chế mỗi tenant tự mang khoá riêng, xem Javadoc `OllamaAiProvider`).
+2. Deploy như bình thường (bước 6) — container `ollama` sẽ khởi động cùng lúc.
+3. **Bắt buộc làm 1 lần** sau khi container `ollama` chạy lần đầu (Ollama không tự tải model):
+   ```bash
+   docker exec docker-ollama-1 ollama pull qwen2.5:3b
+   ```
+   Model ~2GB, tải lần đầu có thể mất vài phút tuỳ tốc độ mạng. Đổi tên model nếu đã sửa
+   `AI_OLLAMA_MODEL` trong `.env`.
+4. **Yêu cầu RAM tối thiểu**: `qwen2.5:3b` cần khoảng 3–4GB RAM rảnh (đã đặt giới hạn 4GB cho
+   container `ollama` trong `docker-compose.yml`, tổng RAM máy chủ nên ≥ 8GB nếu chạy chung với
+   Postgres/Redis/server/web/ml-service). Nếu máy chủ có nhiều RAM hơn (≥16GB) hoặc có GPU NVIDIA,
+   có thể đổi sang model lớn hơn (vd `qwen2.5:7b`) để tăng chất lượng trả lời — sửa
+   `AI_OLLAMA_MODEL`, tăng giới hạn `deploy.resources.limits.memory` của service `ollama`, pull lại
+   model mới, khởi động lại `server`.
+
+**Đã kiểm chứng hợp đồng HTTP thật** (container Ollama tạm thời, `qwen2.5:0.5b`/`qwen2.5:1.5b`, xem
+Javadoc `OllamaAiProvider`) — luồng chọn tool + streaming tổng hợp câu trả lời hoạt động đúng như
+code viết. **Phát hiện quan trọng cần biết trước khi bật cho người dùng thật**: model 1.5B gọi tool
+THÀNH CÔNG khi hỏi bằng tiếng Anh rõ ràng, nhưng KHÔNG gọi được tool khi dùng nguyên system prompt
+tiếng Việt của hệ thống (chỉ hỏi lại chung chung thay vì gọi tool ngay) — model nhỏ có độ tin cậy
+tool-calling tiếng Việt thấp hơn đáng kể so với tiếng Anh hoặc so với Claude. Model mặc định khi
+triển khai (`qwen2.5:3b`, lớn hơn 2 model đã thử) **CHƯA được tự thử trực tiếp** — bắt buộc tự hỏi
+vài câu tiếng Việt thật sau khi pull xong, xác nhận model chọn đúng tool trước khi thông báo tính
+năng cho người dùng cuối. Nếu thấy model thường xuyên KHÔNG chọn tool phù hợp, cân nhắc đổi model
+lớn hơn hoặc thử viết lại system prompt ngắn gọn/trực tiếp hơn.
 
 ## Khắc phục sự cố nhanh
 

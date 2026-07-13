@@ -1,3 +1,107 @@
+## PROJECT_STATE — cập nhật sau khi thêm OllamaAiProvider (yêu cầu người dùng, ngoài roadmap) — 2026-07-13
+
+### Bối cảnh
+Sau khi Prompt #1–#12 đã deploy lên production thật (xem mục "Đã deploy production" bên dưới),
+người dùng hỏi có thể thay API Anthropic bằng cách "tự build" — làm rõ qua `AskUserQuestion`: chọn
+tự host model mã nguồn mở qua Ollama, KHÔNG phải đổi sang nhà cung cấp đám mây khác.
+
+### Thay đổi
+- `OllamaAiProvider` (mới) implements `AiProvider` y hệt `ClaudeAiProvider` — gọi Ollama Chat API
+  (`POST /api/chat`, định dạng tool tương thích OpenAI function-calling, KHÁC định dạng
+  `input_schema` riêng của Anthropic). Đọc NDJSON (mỗi dòng 1 JSON hoàn chỉnh) cho streaming, khác
+  khung SSE `data:` của Claude.
+- **Cả 2 provider đều `@ConditionalOnProperty` theo `app.ai.provider.type`** (`claude` mặc định
+  `matchIfMissing=true`, `ollama` khi chọn tường minh) — CHỈ 1 bean `AiProvider` tồn tại tuỳ cấu
+  hình, tránh đúng lớp lỗi "2 bean cùng kiểu, Spring tự chọn nhầm" đã gặp với DataSource/JdbcTemplate
+  ở Prompt #11 (xem `[[spring_multi_datasource_gotchas]]` trong bộ nhớ) — lần này chủ động phòng
+  ngừa ngay từ đầu thay vì tự phát hiện qua test.
+- Ollama KHÔNG dùng `AiSettingsService` (không cần khoá API riêng từng tenant — tài nguyên dùng
+  chung toàn nền tảng, chỉ cần quyền `ai:use`).
+- CHỈ 1 model duy nhất cho cả hỏi đáp thường và "giải thích" (khác Claude có Haiku/Sonnet) — quyết
+  định có chủ đích vì máy chủ tự host thường RAM hạn chế.
+- `docker-compose.yml`: thêm service `ollama` (image chính thức `ollama/ollama`), giới hạn RAM 4GB
+  (phòng hộ máy chủ ít RAM), không publish port ra host, không `depends_on` (độ lập với `server`,
+  giống nguyên tắc của `ml-service`).
+- `.env`/`.env.example`: thêm `AI_PROVIDER_TYPE`, `AI_OLLAMA_MODEL` (mặc định `qwen2.5:3b`, ~2GB,
+  chọn dựa trên RAM Docker đo thực tế của máy chủ hiện tại ~8GB).
+- `README_DEPLOY.md` mục 12 viết lại thành 12a/12b/12c (chung, Claude, Ollama).
+
+### Xác nhận chạy thật — mức độ hiếm có cho 1 provider AI trong dự án này
+Khác hẳn `ClaudeAiProvider` (chưa từng gọi thử vì không có khoá API thật), `OllamaAiProvider` ĐÃ
+được kiểm chứng bằng Ollama thật: dựng 1 container Ollama tạm thời độc lập (không đụng
+docker-compose sản xuất), pull thật `qwen2.5:0.5b` và `qwen2.5:1.5b`, gọi trực tiếp `POST
+/api/chat` với đúng cấu trúc message/tool mà code sinh ra — xác nhận CẢ 2 lượt: lượt 1 (không
+stream) trả về đúng `message.tool_calls[0].function.name/arguments`, lượt 2 (stream) trả về đúng
+NDJSON với `message.content` tăng dần + `done:true` ở dòng cuối, model dùng ĐÚNG số liệu tool-result
+giả lập trong câu trả lời (không bịa). Dọn container tạm sau khi xong, xác nhận lại stack sản xuất
+(`docker-server-1`/`docker-web-1`/...) không bị ảnh hưởng.
+
+**Phát hiện quan trọng khi kiểm chứng**: model 1.5B gọi tool THÀNH CÔNG với prompt tiếng Anh rõ
+ràng, nhưng KHÔNG gọi được tool khi dùng nguyên system prompt tiếng Việt của hệ thống (chỉ hỏi lại
+chung chung) — độ tin cậy tool-calling tiếng Việt của model nhỏ có thể thấp hơn đáng kể so với
+tiếng Anh/Claude. Model mặc định triển khai (`qwen2.5:3b`, lớn hơn 2 model đã thử) CHƯA được tự thử
+trực tiếp — đã ghi rõ trong Javadoc + README_DEPLOY.md là bắt buộc tự hỏi thử bằng tiếng Việt thật
+sau khi pull xong trước khi thông báo cho người dùng cuối.
+
+`mvn verify` đầy đủ (clean, sau khi Spotless tự format lại 2 file mới/sửa): **117 unit + 52 IT, TẤT
+CẢ XANH**, `spotless:check` sạch, JaCoCo đạt — không có test unit riêng cho `OllamaAiProvider` (theo
+đúng tiền lệ `ClaudeAiProvider` — provider gọi HTTP thật không unit test trực tiếp, chỉ kiểm chứng
+qua gọi thật như trên + `AiAssistantService` đã có unit test đầy đủ mock `AiProvider`).
+
+### Đã deploy production (trước khi thêm Ollama, MỤC RIÊNG vì đây là hành động rủi ro cao)
+Trong phiên làm việc này, đã: phát hiện + vá lỗ hổng Critical có sẵn từ trước (`JWT_SECRET` là giá
+trị mẫu `.env.example`, ai đọc repo cũng giả mạo được token — xác nhận với người dùng trước vì đổi
+sẽ đăng xuất toàn bộ user đang đăng nhập), backup production trước khi migrate
+(`backups/quanlycuahang-daily-20260713-102925.dump`), deploy Prompt #1–#12 lên `docker-server-1`/
+`docker-web-1`/`docker-postgres-1`/`docker-redis-1` + container mới `docker-ml-service-1`, xác nhận
+Flyway migrate sạch V16→V32 qua `flyway_schema_history` (không chỉ đọc log), xác nhận dữ liệu
+nguyên vẹn (2 tenant/19 đơn/5 user khớp trước-sau), xác nhận role `fruithouse_ai_readonly` dùng
+đúng mật khẩu mới. Thao tác deploy bị chặn 2 lần bởi auto-mode classifier (yêu cầu xác nhận rõ ràng
+đặt tên đúng container/hành động) trước khi được duyệt — đúng thiết kế an toàn cho hành động sản
+xuất rủi ro cao, không phải lỗi.
+
+### Cập nhật — ĐÃ deploy Ollama lên production thật + 2 lỗi thật tự phát hiện qua chính lần deploy
+Deploy tiếp theo (cùng ngày, người dùng xác nhận "làm hết"): build lại `docker-server-1` với
+`OllamaAiProvider`, container `docker-ollama-1` khởi động healthy, `docker exec ... ollama pull
+qwen2.5:3b` thành công (1.9GB). Vì không được đoán/dùng thử mật khẩu đăng nhập thật của production
+(auto-mode classifier chặn đúng, hợp lý), kiểm chứng bằng cách gọi THẲNG Ollama API qua network nội
+bộ (`docker exec docker-server-1 wget ... http://ollama:11434/api/chat`) với ĐÚNG cấu trúc
+message/tool + ĐÚNG model production (`qwen2.5:3b`, không phải model nhỏ hơn đã thử trước đó) —
+phát hiện 2 lỗi thật ngay tại đây, đã vá ngay trong code trước khi coi là xong:
+
+1. **Model trả lời SAI NGÔN NGỮ**: với system prompt "nhẹ" ban đầu (copy gần như nguyên văn từ
+   `ClaudeAiProvider`), `qwen2.5:3b` chọn tool ĐÚNG nhưng khi tổng hợp câu trả lời lại dùng TIẾNG
+   ANH + đơn vị tiền RMB (Nhân dân tệ, hoàn toàn sai) dù system prompt đã ghi "trả lời bằng tiếng
+   Việt". Model nhỏ cần chỉ dẫn TƯỜNG MINH hơn hẳn Claude. Vá bằng cách viết lại system prompt
+   riêng cho Ollama (khác bản của Claude): "BẮT BUỘC tra loi 100% bang TIENG VIET", chỉ định rõ đơn
+   vị "đồng/đ" + định dạng số kiểu Việt Nam. Test lại NGAY với cùng dữ liệu — model trả lời đúng
+   100% tiếng Việt, đúng đơn vị, và tính đúng cả phép cộng tổng doanh thu/số đơn.
+2. **Timeout cấu hình quá sát so với thực tế đo được**: đo trực tiếp trên production (CPU, không
+   GPU) — nạp model lần đầu vào RAM tốn ~17 giây, lượt 1 (chọn tool) ~8-28 giây, lượt 2 (tổng hợp
+   câu trả lời) ~17-42 giây tuỳ độ dài câu trả lời — TỔNG có thể chạm ~60-90 giây, vượt xa
+   `SSE_TIMEOUT_MILLIS=40s` (cũ, chỉ là ước lượng trước khi có Ollama thật) và
+   `app.ai.ollama.timeout-seconds=60s` (cũ) — nghĩa là câu trả lời có thể bị cắt ngang giữa chừng
+   trong thực tế sử dụng. Vá bằng cách nâng `timeout-seconds` lên 120s, `SSE_TIMEOUT_MILLIS` lên
+   150s (luôn lớn hơn timeout riêng của provider đang dùng, để provider tự báo lỗi rõ ràng trước
+   khi SseEmitter cắt ngang), và thêm `"keep_alive": "30m"` vào mọi request gửi Ollama (mặc định
+   Ollama chỉ giữ model "ấm" 5 phút) để giảm tần suất người dùng gặp phải lần nạp model chậm.
+
+Build lại + deploy lại lần 2 với 2 bản vá trên, xác nhận cả 6 container healthy, dọn container thử
+nghiệm tạm (`reverent_shamir`, sót lại từ lần kiểm chứng ml-service trước đó trong phiên).
+`mvn verify` đầy đủ vẫn xanh sau khi vá (117 unit + 52 IT).
+
+### Giới hạn phạm vi còn lại
+- **Chưa kiểm chứng qua đúng luồng HTTP `/api/v1/ai/ask` có xác thực thật** (chỉ mới gọi thẳng
+  Ollama qua network nội bộ, bỏ qua tầng Controller/SseEmitter/AiAssistantService) — vì không được
+  phép đoán/dùng thử mật khẩu đăng nhập production. Cần TỰ đăng nhập bằng tài khoản thật và hỏi thử
+  qua giao diện trước khi thông báo tính năng cho người dùng cuối, để xác nhận luôn cả tầng SSE
+  streaming/audit log/bộ nhớ hội thoại hoạt động đúng với Ollama (các tầng này đã có unit test mock
+  `AiProvider`, nhưng chưa có 1 lần chạy thật đầu-cuối qua HTTP thật).
+- Chưa kiểm chứng GPU passthrough (đã viết sẵn cấu hình comment trong `docker-compose.yml` nhưng
+  chưa thử trên phần cứng thật).
+
+---
+
 ## PROJECT_STATE — cập nhật sau Prompt #12 (Nâng cấp AI đợt 2 — Phần II roadmap) — 2026-07-13
 
 ### Bối cảnh: Phần II mới của roadmap

@@ -16,6 +16,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -51,8 +52,22 @@ import org.springframework.web.client.RestClientResponseException;
  * (explain, phan tich phuc tap hon) dung model MANH HON ({@code app.ai.provider.advanced-model},
  * mac dinh Sonnet). CAN KIEM CHUNG LAI ten model chinh xac voi tai lieu Anthropic hien tai luc
  * trien khai that (docs.anthropic.com), giong luu y ve default model truoc day.
+ *
+ * <p><b>{@code @ConditionalOnProperty matchIfMissing = true}</b>: day la provider MAC DINH (giu
+ * nguyen hanh vi truoc khi co lua chon Ollama tu-host o Prompt #12 tiep theo) - CHI bi thay the khi
+ * {@code app.ai.provider.type=ollama} tuong minh. Bat buoc dung dieu kien nay (khong de ca 2
+ * provider cung khong dieu kien) de tranh dung LAP LAI dung bug lop "2 bean cung kieu, Spring tu
+ * chon nham" da tung gap voi DataSource/JdbcTemplate (xem Javadoc AiReadOnlyDataSourceConfig) - o
+ * day neu ca ClaudeAiProvider va OllamaAiProvider deu la @Component khong dieu kien, se co 2 bean
+ * AiProvider cung luc, AiAssistantService se KHONG BIET dung provider nao (loi khoi dong ro rang,
+ * may man hon truong hop DataSource vi it nhat se FAIL FAST thay vi im lang dung nham).
  */
 @Component
+@ConditionalOnProperty(
+    prefix = "app.ai.provider",
+    name = "type",
+    havingValue = "claude",
+    matchIfMissing = true)
 public class ClaudeAiProvider implements AiProvider {
 
   private static final Logger log = LoggerFactory.getLogger(ClaudeAiProvider.class);

@@ -145,6 +145,11 @@ app:
     # AI_SETTINGS_ENCRYPTION_KEY that (32 byte, base64) o production - xem README_DEPLOY.md.
     settings-encryption-key: ${AI_SETTINGS_ENCRYPTION_KEY:}
     provider:
+      # "claude" (API dam may Anthropic, tra phi theo token, can khoa API rieng tung tenant) hoac
+      # "ollama" (tu host tren chinh may chu, mien phi, khong can khoa API - xem OllamaAiProvider) -
+      # CHI 1 trong 2 bean AiProvider duoc tao tuy gia tri nay (@ConditionalOnProperty), tranh loi
+      # lop "2 bean cung kieu" da gap voi DataSource/JdbcTemplate truoc do.
+      type: ${AI_PROVIDER_TYPE:claude}
       # Model mac dinh cho hoi dap thuong ngay (widget chat Dashboard, Prompt #12 chuyen sang tang
       # NHANH/RE hon vi da co streaming + lich su hoi thoai lam da so cau hoi don gian, khong can
       # model manh nhat). De o day (bien moi truong) thay vi hardcode trong code, de doi khi
@@ -157,6 +162,21 @@ app:
       # phan tich phuc tap hon cau hoi thuong, chap nhan cham/dat hon de doi lay chat luong.
       advanced-model: ${AI_ADVANCED_MODEL:claude-sonnet-5}
       timeout-seconds: 30
+    ollama:
+      # Ten container trong docker network noi bo (xem docker-compose.yml) - KHONG expose port
+      # 11434 ra host, giong nguyen tac cua ml-service.
+      base-url: ${AI_OLLAMA_BASE_URL:http://ollama:11434}
+      # qwen2.5:3b (~2GB) - chon vi phu hop RAM khiem ton cua may chu tu host dien hinh (dung chung
+      # voi Postgres/Redis/server/web/ml-service). CAN pull model nay 1 lan sau khi container
+      # "ollama" chay lan dau: `docker exec <ten-container-ollama> ollama pull qwen2.5:3b` (xem
+      # README_DEPLOY.md). Neu may chu co nhieu RAM/GPU hon, doi sang model lon hon (vd qwen2.5:7b)
+      # de tang chat luong tra loi.
+      model: ${AI_OLLAMA_MODEL:qwen2.5:3b}
+      # DA DO THAT tren production (CPU, khong GPU): nap model lan dau ~17s, 1 lan hoi co tool +
+      # tong hop cau tra loi VNI dai co the toi ~45-60s TONG CONG ke ca khi model da "am" (khong
+      # tinh lan dau) - 60s (gia tri cu, chi dua tren uoc luong truoc khi co Ollama that) qua sat,
+      # se cat ngang cau tra loi dang tot. Nang len 120s de co bien do an toan that su.
+      timeout-seconds: 120
     ml-service:
       # Dich vu Python rieng (FastAPI + scikit-learn, xem ml-service/) tinh du bao nhap hang nang
       # cao (IsolationForest loc ngay ban bat thuong) - noi bo, KHONG expose port ra host (chi goi

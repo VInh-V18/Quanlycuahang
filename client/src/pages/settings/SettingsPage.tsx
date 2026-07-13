@@ -335,7 +335,7 @@ export function SettingsPage() {
                     disabled={!canEdit || loading}
                     value={form.store_phone ?? ""}
                     onChange={(e) => set("store_phone", e.target.value)}
-                    placeholder="VD: 0396302983 - 0354639686"
+                    placeholder="VD: 0123456789 - 0987654321"
                   />
                 </div>
               </div>
@@ -348,7 +348,7 @@ export function SettingsPage() {
                     disabled={!canEdit || loading}
                     value={form.bank_account_name ?? ""}
                     onChange={(e) => set("bank_account_name", e.target.value.toUpperCase())}
-                    placeholder="VD: TRINH THI LIEN"
+                    placeholder="VD: NGUYỄN VĂN A"
                   />
                 </div>
                 <div>
