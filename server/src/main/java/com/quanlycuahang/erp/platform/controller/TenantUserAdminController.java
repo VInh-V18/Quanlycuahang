@@ -19,9 +19,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Super Admin CRUD tai khoan cua 1 tenant cu the (ho tro chu cua hang: quen mat khau, can them
- * tai khoan...) - chi Super Admin goi duoc (SecurityConfig da bat buoc authority PLATFORM_ADMIN
- * cho toan bo /api/v1/platform-admin/**).
+ * Super Admin CRUD tai khoan cua 1 tenant cu the (ho tro chu cua hang: quen mat khau, can them tai
+ * khoan...) - chi Super Admin goi duoc (SecurityConfig da bat buoc authority PLATFORM_ADMIN cho
+ * toan bo /api/v1/platform-admin/**).
  */
 @RestController
 @RequestMapping("/api/v1/platform-admin/tenants/{tenantId}/users")
@@ -57,6 +57,18 @@ public class TenantUserAdminController {
   public ResponseEntity<ApiResponse<Void>> deactivate(
       @PathVariable Long tenantId, @PathVariable Long userId) {
     tenantUserAdminService.deactivate(tenantId, userId);
+    return ResponseEntity.ok(ApiResponse.success(null));
+  }
+
+  /**
+   * XOA VINH VIEN (khac DELETE /{userId} o tren - chi vo hieu hoa). Duong dan rieng vi DELETE
+   * /{userId} da mang y nghia "vo hieu hoa" tu truoc, khong the doi ngu nghia ngay tren cung 1
+   * duong dan. Xem TenantUserAdminService.delete().
+   */
+  @DeleteMapping("/{userId}/permanent")
+  public ResponseEntity<ApiResponse<Void>> delete(
+      @PathVariable Long tenantId, @PathVariable Long userId) {
+    tenantUserAdminService.delete(tenantId, userId);
     return ResponseEntity.ok(ApiResponse.success(null));
   }
 

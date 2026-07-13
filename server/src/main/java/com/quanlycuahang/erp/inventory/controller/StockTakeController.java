@@ -1,5 +1,6 @@
 package com.quanlycuahang.erp.inventory.controller;
 
+import com.quanlycuahang.erp.common.audit.Audited;
 import com.quanlycuahang.erp.common.dto.ApiResponse;
 import com.quanlycuahang.erp.inventory.dto.StockTakeCreateRequest;
 import com.quanlycuahang.erp.inventory.dto.StockTakeResponse;
@@ -58,6 +59,10 @@ public class StockTakeController {
 
   @PostMapping("/{id}/approve")
   @PreAuthorize("hasAuthority('stock-take:approve')")
+  // Duyet kiem ke sua truc tiep ton kho (anh huong tai chinh) - truoc day khong ghi audit log
+  // trong khi cac hanh dong tuong duong (sua gia nhap, xoa san pham) deu co (phat hien khi rieng
+  // soat).
+  @Audited(action = "STOCK_TAKE_APPROVE", entityName = "StockTake")
   public ResponseEntity<ApiResponse<StockTakeResponse>> approve(@PathVariable Long id) {
     return ResponseEntity.ok(ApiResponse.success(stockTakeService.approve(id)));
   }

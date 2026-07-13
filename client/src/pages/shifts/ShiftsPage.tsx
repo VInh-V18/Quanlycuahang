@@ -22,23 +22,26 @@ import {
 } from "@/components/ui/select";
 import { DataTable, type DataTableColumn } from "@/components/common/DataTable";
 import { Money } from "@/components/common/Money";
+import { QueryBoundary } from "@/components/common/QueryBoundary";
 import { useToast } from "@/components/ui/use-toast";
 import {
   addCashTransaction,
   closeShift,
   getCurrentShift,
+  getShiftById,
   listShiftHistory,
   openShift,
   type ShiftDetail,
   type ShiftSummary,
 } from "@/lib/api/shifts";
 import { getApiErrorMessage } from "@/lib/http/errors";
+import { formatDateTime as formatDateTimeShared } from "@/lib/utils";
 
 const PAGE_SIZE = 20;
 
 function formatDateTime(iso: string | null): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleString("vi-VN");
+  return formatDateTimeShared(iso);
 }
 
 function OpenShiftCard() {
@@ -235,30 +238,12 @@ function CloseShiftDialog({ shift, onClose }: { shift: ShiftDetail; onClose: () 
   );
 }
 
-function CurrentShiftCard({ shift }: { shift: ShiftDetail }) {
-  const [showCashTx, setShowCashTx] = useState(false);
-  const [showClose, setShowClose] = useState(false);
-
+/** Lưới thống kê + danh sách thu/chi trong ca — dùng chung cho "Ca đang mở" (CurrentShiftCard) VÀ
+ * dialog xem lại chi tiết 1 ca đã đóng trong lịch sử (ShiftDetailDialog), tránh 2 bản lệch nhau. */
+function ShiftDetailStats({ shift }: { shift: ShiftDetail }) {
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <div>
-          <CardTitle>Ca đang mở</CardTitle>
-          <CardDescription>
-            Mở lúc {formatDateTime(shift.openedAt)} · {shift.cashierName}
-          </CardDescription>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowCashTx(true)}>
-            <Plus className="h-4 w-4" />
-            Thu/chi tiền mặt
-          </Button>
-          <Button variant="destructive" onClick={() => setShowClose(true)}>
-            Đóng ca
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+    <>
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <div>
           <div className="text-xs text-muted-foreground">Tiền đầu ca</div>
           <div className="text-lg font-semibold">
@@ -305,9 +290,34 @@ function CurrentShiftCard({ shift }: { shift: ShiftDetail }) {
             <Money value={shift.expectedCash} />
           </div>
         </div>
-      </CardContent>
+        {shift.status === "closed" && (
+          <div>
+            <div className="text-xs text-muted-foreground">Tiền mặt thực đếm</div>
+            <div
+              className={`text-lg font-bold ${
+                shift.discrepancy === 0 ? "text-success" : "text-destructive"
+              }`}
+            >
+              <Money value={shift.actualCash ?? 0} />
+            </div>
+          </div>
+        )}
+        {shift.status === "closed" && (
+          <div>
+            <div className="text-xs text-muted-foreground">Chênh lệch</div>
+            <div
+              className={`text-lg font-bold ${
+                shift.discrepancy === 0 ? "text-success" : "text-destructive"
+              }`}
+            >
+              {shift.discrepancy != null && shift.discrepancy > 0 ? "+" : ""}
+              {(shift.discrepancy ?? 0).toLocaleString("vi-VN")}đ
+            </div>
+          </div>
+        )}
+      </div>
       {shift.cashTransactions.length > 0 && (
-        <CardContent className="border-t pt-3">
+        <div className="mt-4 border-t pt-3">
           <div className="mb-2 text-sm font-semibold">Giao dịch thu/chi trong ca</div>
           <div className="space-y-2">
             {shift.cashTransactions.map((tx) => (
@@ -328,8 +338,38 @@ function CurrentShiftCard({ shift }: { shift: ShiftDetail }) {
               </div>
             ))}
           </div>
-        </CardContent>
+        </div>
       )}
+    </>
+  );
+}
+
+function CurrentShiftCard({ shift }: { shift: ShiftDetail }) {
+  const [showCashTx, setShowCashTx] = useState(false);
+  const [showClose, setShowClose] = useState(false);
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+        <div>
+          <CardTitle>Ca đang mở</CardTitle>
+          <CardDescription>
+            Mở lúc {formatDateTime(shift.openedAt)} · {shift.cashierName}
+          </CardDescription>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowCashTx(true)}>
+            <Plus className="h-4 w-4" />
+            Thu/chi tiền mặt
+          </Button>
+          <Button variant="destructive" onClick={() => setShowClose(true)}>
+            Đóng ca
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <ShiftDetailStats shift={shift} />
+      </CardContent>
 
       {showCashTx && <CashTransactionDialog shiftId={shift.id} onClose={() => setShowCashTx(false)} />}
       {showClose && <CloseShiftDialog shift={shift} onClose={() => setShowClose(false)} />}
@@ -337,9 +377,60 @@ function CurrentShiftCard({ shift }: { shift: ShiftDetail }) {
   );
 }
 
+/** Xem lại chi tiết 1 ca TỪ LỊCH SỬ (đang mở hoặc đã đóng) — chọn dialog thay vì trang/route riêng
+ * vì đây chỉ là xem lại (read-only), không có hành động sửa nào cần URL riêng để chia sẻ/bookmark;
+ * dialog nhẹ hơn, giữ nguyên ngữ cảnh danh sách lịch sử ca đang xem (roadmap Prompt #5, mục 2). */
+function ShiftDetailDialog({ shiftId, onClose }: { shiftId: number; onClose: () => void }) {
+  const {
+    data: shift,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["shifts", "detail", shiftId],
+    queryFn: () => getShiftById(shiftId),
+  });
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Chi tiết ca làm việc</DialogTitle>
+        </DialogHeader>
+        <QueryBoundary
+          isLoading={isLoading}
+          isError={isError}
+          error={error}
+          data={shift}
+          onRetry={() => refetch()}
+          notFoundMessage="Không tìm thấy ca làm việc này — có thể đã bị xoá hoặc bạn không có quyền xem."
+        >
+          {(shift) => (
+            <div>
+              <p className="mb-3 text-sm text-muted-foreground">
+                Mở lúc {formatDateTime(shift.openedAt)}
+                {shift.closedAt && <> · Đóng lúc {formatDateTime(shift.closedAt)}</>} ·{" "}
+                {shift.cashierName}
+              </p>
+              <ShiftDetailStats shift={shift} />
+            </div>
+          )}
+        </QueryBoundary>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Đóng
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function ShiftsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [page, setPage] = useState(0);
+  const [selectedShiftId, setSelectedShiftId] = useState<number | null>(null);
 
   const currentShiftQuery = useQuery({ queryKey: ["shifts", "current"], queryFn: getCurrentShift });
 
@@ -440,10 +531,15 @@ export function ShiftsPage() {
             loading={historyQuery.isLoading}
             error={historyQuery.isError ? getApiErrorMessage(historyQuery.error) : null}
             onPageChange={setPage}
+            onRowClick={(row) => setSelectedShiftId(row.id)}
             emptyMessage="Chưa có ca làm việc nào"
           />
         </CardContent>
       </Card>
+
+      {selectedShiftId != null && (
+        <ShiftDetailDialog shiftId={selectedShiftId} onClose={() => setSelectedShiftId(null)} />
+      )}
     </div>
   );
 }

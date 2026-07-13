@@ -39,6 +39,7 @@ import {
   type Product,
 } from "@/lib/api/products";
 import { useCurrentBranchId } from "@/lib/hooks/useCurrentBranchId";
+import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import { getApiErrorMessage } from "@/lib/http/errors";
 
 const PAGE_SIZE = 20;
@@ -60,16 +61,18 @@ export function ProductsPage() {
     permissions.includes("category:update") ||
     permissions.includes("category:delete");
 
+  const debouncedSearch = useDebouncedValue(search);
+
   const params = useMemo(
     () => ({
       page,
       size: PAGE_SIZE,
-      search,
+      search: debouncedSearch,
       categoryId: categoryId === "all" ? undefined : Number(categoryId),
       active: active === "all" ? undefined : active === "active",
       branchId,
     }),
-    [page, search, categoryId, active, branchId],
+    [page, debouncedSearch, categoryId, active, branchId],
   );
 
   const { data, isLoading, isError, error } = useQuery({

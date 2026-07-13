@@ -11,8 +11,10 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Quan ly nhom khach hang (VIP/Than thiet/Doanh nghiep...) — dung de loc + gan cho khach hang o
- * trang Khach hang, khong co quy tac chiet khau rieng gan voi nhom (chiet khau nam o Voucher). */
+/**
+ * Quan ly nhom khach hang (VIP/Than thiet/Doanh nghiep...) — dung de loc + gan cho khach hang o
+ * trang Khach hang, khong co quy tac chiet khau rieng gan voi nhom (chiet khau nam o Voucher).
+ */
 @Service
 public class CustomerGroupService {
 
@@ -27,7 +29,9 @@ public class CustomerGroupService {
 
   @Transactional(readOnly = true)
   public List<CustomerGroupResponse> list() {
-    return customerGroupRepository.findAll().stream().map(CustomerGroupService::toResponse).toList();
+    return customerGroupRepository.findAll().stream()
+        .map(CustomerGroupService::toResponse)
+        .toList();
   }
 
   @Transactional
@@ -42,7 +46,7 @@ public class CustomerGroupService {
     CustomerGroup group =
         customerGroupRepository
             .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay nhom khach hang"));
+            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhóm khách hàng"));
     group.setName(request.getName());
     return toResponse(customerGroupRepository.save(group));
   }
@@ -50,12 +54,12 @@ public class CustomerGroupService {
   @Transactional
   public void delete(Long id) {
     if (!customerGroupRepository.existsById(id)) {
-      throw new ResourceNotFoundException("Khong tim thay nhom khach hang");
+      throw new ResourceNotFoundException("Không tìm thấy nhóm khách hàng");
     }
     if (customerRepository.existsByCustomerGroupId(id)) {
       throw new BusinessRuleException(
           "CUSTOMER_GROUP_HAS_CUSTOMERS",
-          "Nhom con khach hang, vui long chuyen khach sang nhom khac truoc khi xoa");
+          "Nhóm còn khách hàng, vui lòng chuyển khách sang nhóm khác trước khi xóa");
     }
     customerGroupRepository.deleteById(id);
   }

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
-import { Plus, Users2 } from "lucide-react";
+import { MoreHorizontal, Plus, Users2 } from "lucide-react";
 import { useAppSelector } from "@/store/hooks";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +11,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -22,11 +28,13 @@ import {
 } from "@/components/ui/select";
 import { DataTable, type DataTableColumn } from "@/components/common/DataTable";
 import { Money } from "@/components/common/Money";
+import { PermissionGate } from "@/components/common/PermissionGate";
 import { useToast } from "@/components/ui/use-toast";
 import { CustomerGroupManagerDialog } from "@/components/partners/CustomerGroupManagerDialog";
 import {
   createCustomer,
   listCustomersWithStats,
+  updateCustomer,
   type CustomerListItem,
   type CustomerRequest,
 } from "@/lib/api/customers";
@@ -34,44 +42,95 @@ import { listCustomerGroups, type CustomerGroup } from "@/lib/api/customerGroups
 import {
   createSupplier,
   listSuppliersWithStats,
+  updateSupplier,
   type Supplier,
   type SupplierRequest,
 } from "@/lib/api/suppliers";
+import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import { getApiErrorMessage } from "@/lib/http/errors";
+import { formatDate as formatDateShared } from "@/lib/utils";
+import type { ApiSuccess } from "@/types/api";
 
 const PAGE_SIZE = 20;
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("vi-VN");
+  return formatDateShared(iso);
 }
 
-function CustomerFormDialog({
+/** Dùng chung cho cả "Thêm" và "Sửa" (tránh 2 bản form lệch nhau theo thời gian) — có `customer`
+ * thì là sửa (PUT + optimistic update ngay trên trang danh sách đang xem), không thì là thêm mới. */
+export function CustomerFormDialog({
   groups,
+  customer,
+  listQueryKey,
   onClose,
 }: {
   groups: CustomerGroup[];
+  customer?: CustomerListItem;
+  listQueryKey: QueryKey;
   onClose: () => void;
 }) {
-  const [form, setForm] = useState<CustomerRequest>({
-    name: "",
-    phone: "",
-    address: "",
-    debtLimit: 0,
-    customerGroupId: null,
-  });
+  const isEdit = !!customer;
+  const [form, setForm] = useState<CustomerRequest>(
+    customer
+      ? {
+          name: customer.name,
+          phone: customer.phone,
+          address: customer.address,
+          debtLimit: customer.debtLimit,
+          customerGroupId: customer.customerGroupId,
+        }
+      : { name: "", phone: "", address: "", debtLimit: 0, customerGroupId: null },
+  );
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const mutation = useMutation({
-    mutationFn: () => createCustomer(form),
+    mutationFn: () => (isEdit ? updateCustomer(customer.id, form) : createCustomer(form)),
+    onMutate: async () => {
+      if (!isEdit) return undefined;
+      await queryClient.cancelQueries({ queryKey: listQueryKey });
+      const previous = queryClient.getQueryData<ApiSuccess<CustomerListItem[]>>(listQueryKey);
+      queryClient.setQueryData<ApiSuccess<CustomerListItem[]> | undefined>(listQueryKey, (old) =>
+        old
+          ? {
+              ...old,
+              data: old.data.map((row) =>
+                row.id === customer.id
+                  ? {
+                      ...row,
+                      name: form.name,
+                      phone: form.phone ?? null,
+                      address: form.address ?? null,
+                      debtLimit: form.debtLimit ?? 0,
+                      customerGroupId: form.customerGroupId ?? null,
+                      groupName:
+                        groups.find((g) => g.id === form.customerGroupId)?.name ?? null,
+                    }
+                  : row,
+              ),
+            }
+          : old,
+      );
+      return { previous };
+    },
     onSuccess: () => {
-      toast({ title: "Đã thêm khách hàng" });
-      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      toast({ title: isEdit ? "Đã lưu thay đổi" : "Đã thêm khách hàng" });
       onClose();
     },
-    onError: (err) => {
-      toast({ variant: "destructive", title: "Không thể thêm", description: getApiErrorMessage(err) });
+    onError: (err, _vars, context) => {
+      if (isEdit && context?.previous) {
+        queryClient.setQueryData(listQueryKey, context.previous);
+      }
+      toast({
+        variant: "destructive",
+        title: isEdit ? "Không thể lưu" : "Không thể thêm",
+        description: getApiErrorMessage(err),
+      });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
     },
   });
 
@@ -79,7 +138,7 @@ function CustomerFormDialog({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Thêm khách hàng</DialogTitle>
+          <DialogTitle>{isEdit ? "Sửa khách hàng" : "Thêm khách hàng"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           <div>
@@ -148,20 +207,60 @@ function CustomerFormDialog({
   );
 }
 
-function SupplierFormDialog({ onClose }: { onClose: () => void }) {
-  const [form, setForm] = useState<SupplierRequest>({ name: "", phone: "" });
+export function SupplierFormDialog({
+  supplier,
+  listQueryKey,
+  onClose,
+}: {
+  supplier?: Supplier;
+  listQueryKey: QueryKey;
+  onClose: () => void;
+}) {
+  const isEdit = !!supplier;
+  const [form, setForm] = useState<SupplierRequest>(
+    supplier
+      ? { name: supplier.name, phone: supplier.phone, address: supplier.address }
+      : { name: "", phone: "" },
+  );
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const mutation = useMutation({
-    mutationFn: () => createSupplier(form),
+    mutationFn: () => (isEdit ? updateSupplier(supplier.id, form) : createSupplier(form)),
+    onMutate: async () => {
+      if (!isEdit) return undefined;
+      await queryClient.cancelQueries({ queryKey: listQueryKey });
+      const previous = queryClient.getQueryData<ApiSuccess<Supplier[]>>(listQueryKey);
+      queryClient.setQueryData<ApiSuccess<Supplier[]> | undefined>(listQueryKey, (old) =>
+        old
+          ? {
+              ...old,
+              data: old.data.map((row) =>
+                row.id === supplier.id
+                  ? { ...row, name: form.name, phone: form.phone ?? null, address: form.address ?? null }
+                  : row,
+              ),
+            }
+          : old,
+      );
+      return { previous };
+    },
     onSuccess: () => {
-      toast({ title: "Đã thêm nhà cung cấp" });
-      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      toast({ title: isEdit ? "Đã lưu thay đổi" : "Đã thêm nhà cung cấp" });
       onClose();
     },
-    onError: (err) => {
-      toast({ variant: "destructive", title: "Không thể thêm", description: getApiErrorMessage(err) });
+    onError: (err, _vars, context) => {
+      if (isEdit && context?.previous) {
+        queryClient.setQueryData(listQueryKey, context.previous);
+      }
+      toast({
+        variant: "destructive",
+        title: isEdit ? "Không thể lưu" : "Không thể thêm",
+        description: getApiErrorMessage(err),
+      });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
     },
   });
 
@@ -169,7 +268,7 @@ function SupplierFormDialog({ onClose }: { onClose: () => void }) {
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Thêm nhà cung cấp</DialogTitle>
+          <DialogTitle>{isEdit ? "Sửa nhà cung cấp" : "Thêm nhà cung cấp"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           <div>
@@ -219,6 +318,8 @@ export function PartnersPage() {
   const [groupId, setGroupId] = useState("all");
   const [page, setPage] = useState(0);
   const [showForm, setShowForm] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<CustomerListItem | null>(null);
+  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [showGroupManager, setShowGroupManager] = useState(false);
   const permissions = useAppSelector((state) => state.auth.permissions);
   const canManageGroups = permissions.includes("customer:create") || permissions.includes("customer:update");
@@ -230,27 +331,34 @@ export function PartnersPage() {
   });
   const groups = groupsQuery.data ?? [];
 
+  const debouncedSearch = useDebouncedValue(search);
+
   const customerParams = useMemo(
     () => ({
-      search,
+      search: debouncedSearch,
       page,
       size: PAGE_SIZE,
       hasDebt: hasDebt === "all" ? undefined : hasDebt === "yes",
       customerGroupId: groupId === "all" ? undefined : Number(groupId),
     }),
-    [search, page, hasDebt, groupId],
+    [debouncedSearch, page, hasDebt, groupId],
   );
 
+  const customersQueryKey = useMemo(() => ["customers", customerParams] as const, [customerParams]);
   const customersQuery = useQuery({
-    queryKey: ["customers", customerParams],
+    queryKey: customersQueryKey,
     queryFn: () => listCustomersWithStats(customerParams),
     enabled: tab === "customers",
   });
 
-  const supplierParams = useMemo(() => ({ search, page, size: PAGE_SIZE }), [search, page]);
+  const supplierParams = useMemo(
+    () => ({ search: debouncedSearch, page, size: PAGE_SIZE }),
+    [debouncedSearch, page],
+  );
 
+  const suppliersQueryKey = useMemo(() => ["suppliers", supplierParams] as const, [supplierParams]);
   const suppliersQuery = useQuery({
-    queryKey: ["suppliers", supplierParams],
+    queryKey: suppliersQueryKey,
     queryFn: () => listSuppliersWithStats(supplierParams),
     enabled: tab === "suppliers",
   });
@@ -309,6 +417,24 @@ export function PartnersPage() {
       header: "Lần mua cuối",
       render: (row) => formatDate(row.lastPurchaseAt),
     },
+    {
+      key: "actions",
+      header: "",
+      render: (row) => (
+        <PermissionGate perm="customer:update">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setEditingCustomer(row)}>Sửa</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </PermissionGate>
+      ),
+    },
   ];
 
   const supplierColumns: DataTableColumn<Supplier>[] = [
@@ -343,6 +469,24 @@ export function PartnersPage() {
       key: "lastPurchaseAt",
       header: "Lần nhập cuối",
       render: (row) => formatDate(row.lastPurchaseAt),
+    },
+    {
+      key: "actions",
+      header: "",
+      render: (row) => (
+        <PermissionGate perm="supplier:manage">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setEditingSupplier(row)}>Sửa</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </PermissionGate>
+      ),
     },
   ];
 
@@ -443,10 +587,31 @@ export function PartnersPage() {
 
       {showForm &&
         (tab === "customers" ? (
-          <CustomerFormDialog groups={groups} onClose={() => setShowForm(false)} />
+          <CustomerFormDialog
+            groups={groups}
+            listQueryKey={customersQueryKey}
+            onClose={() => setShowForm(false)}
+          />
         ) : (
-          <SupplierFormDialog onClose={() => setShowForm(false)} />
+          <SupplierFormDialog listQueryKey={suppliersQueryKey} onClose={() => setShowForm(false)} />
         ))}
+
+      {editingCustomer && (
+        <CustomerFormDialog
+          groups={groups}
+          customer={editingCustomer}
+          listQueryKey={customersQueryKey}
+          onClose={() => setEditingCustomer(null)}
+        />
+      )}
+
+      {editingSupplier && (
+        <SupplierFormDialog
+          supplier={editingSupplier}
+          listQueryKey={suppliersQueryKey}
+          onClose={() => setEditingSupplier(null)}
+        />
+      )}
 
       {tab === "customers" && (
         <CustomerGroupManagerDialog

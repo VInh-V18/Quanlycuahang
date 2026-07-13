@@ -10,8 +10,10 @@ import org.springframework.data.repository.query.Param;
 
 public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
 
-  /** Lich su audit co loc, dung cho trang Nhat ky audit (chi Owner/Quan ly xem duoc) — cung tieu
-   * chi loc voi cac danh sach khac (khoang ngay + tim theo hanh dong/doi tuong). */
+  /**
+   * Lich su audit co loc, dung cho trang Nhat ky audit (chi Owner/Quan ly xem duoc) — cung tieu chi
+   * loc voi cac danh sach khac (khoang ngay + tim theo hanh dong/doi tuong).
+   */
   @Query(
       value =
           "SELECT a.id, a.created_at, u.full_name, a.action, a.entity_name, a.entity_id, "

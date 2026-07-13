@@ -22,6 +22,22 @@ app:
     # (RFC 6265 — Secure cookie yeu cau ket noi HTTPS).
     refresh-cookie-secure: ${AUTH_REFRESH_COOKIE_SECURE:true}
 
+# Swagger UI/OpenAPI docs permitAll trong SecurityConfig (dung cho dev) — tat o day vi profile
+# docker la profile MAC DINH khi trien khai that (docker-compose.yml), khong chi rieng prod, neu
+# khong toan bo API surface (endpoint, DTO schema) cong khai cho nguoi khong dang nhap (phat hien
+# khi rieng soat).
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+management:
+  endpoint:
+    health:
+      show-details: never
+
 logging:
   level:
+    root: WARN
     com.quanlycuahang.erp: INFO

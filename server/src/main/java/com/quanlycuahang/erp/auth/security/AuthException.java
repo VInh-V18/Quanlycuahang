@@ -15,28 +15,28 @@ public class AuthException extends AppException {
 
   public static AuthException invalidCredentials() {
     return new AuthException(
-        "AUTH_INVALID_CREDENTIALS", HttpStatus.UNAUTHORIZED, "Sai ten dang nhap hoac mat khau");
+        "AUTH_INVALID_CREDENTIALS", HttpStatus.UNAUTHORIZED, "Sai tên đăng nhập hoặc mật khẩu");
   }
 
   public static AuthException rateLimitExceeded() {
     return new AuthException(
         "AUTH_RATE_LIMIT_EXCEEDED",
         HttpStatus.TOO_MANY_REQUESTS,
-        "Qua nhieu lan dang nhap that bai, vui long thu lai sau");
+        "Quá nhiều lần đăng nhập thất bại, vui lòng thử lại sau");
   }
 
   public static AuthException invalidRefreshToken() {
     return new AuthException(
         "AUTH_INVALID_REFRESH_TOKEN",
         HttpStatus.UNAUTHORIZED,
-        "Phien dang nhap khong hop le, vui long dang nhap lai");
+        "Phiên đăng nhập không hợp lệ, vui lòng đăng nhập lại");
   }
 
   public static AuthException refreshTokenReuseDetected() {
     return new AuthException(
         "AUTH_TOKEN_REUSE_DETECTED",
         HttpStatus.UNAUTHORIZED,
-        "Phat hien bat thuong ve phien dang nhap, vui long dang nhap lai");
+        "Phát hiện bất thường về phiên đăng nhập, vui lòng đăng nhập lại");
   }
 
   /**
@@ -48,6 +48,6 @@ public class AuthException extends AppException {
     return new AuthException(
         "AUTH_TENANT_DISABLED",
         HttpStatus.FORBIDDEN,
-        "Cua hang cua ban da bi tam khoa, vui long lien he quan tri he thong");
+        "Cửa hàng của bạn đã bị tạm khóa, vui lòng liên hệ quản trị hệ thống");
   }
 }

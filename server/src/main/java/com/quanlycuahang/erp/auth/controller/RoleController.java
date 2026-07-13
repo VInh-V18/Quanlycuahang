@@ -2,21 +2,23 @@ package com.quanlycuahang.erp.auth.controller;
 
 import com.quanlycuahang.erp.auth.dto.PermissionResponse;
 import com.quanlycuahang.erp.auth.dto.RoleResponse;
-import com.quanlycuahang.erp.auth.dto.UpdateRolePermissionsRequest;
 import com.quanlycuahang.erp.auth.service.RoleService;
 import com.quanlycuahang.erp.common.dto.ApiResponse;
-import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Ma tran phan quyen — xem/sua tap quyen cua tung vai tro (FH-13). */
+/**
+ * Ma tran phan quyen — CHI DOC cho tenant User (FH-13). Role/Permission la du lieu TOAN CUC (dung
+ * chung moi tenant, khong ke thua TenantScopedEntity) - truoc day co them PUT /roles/{id}/
+ * permissions o day, cho phep BAT KY chu cua hang nao (co quyen employee:manage-permission trong
+ * TENANT cua ho) sua thang bang role_permissions dung chung, anh huong toi MOI tenant khac tren he
+ * thong - lo hong bao mat nghiem trong phat hien khi rieng soat toan bo codebase. Thao tac SUA da
+ * chuyen sang rieng cho Super Admin, xem PlatformAdminRoleController.
+ */
 @RestController
 @RequestMapping("/api/v1")
 public class RoleController {
@@ -37,12 +39,5 @@ public class RoleController {
   @PreAuthorize("hasAuthority('employee:view')")
   public ResponseEntity<ApiResponse<List<PermissionResponse>>> listPermissions() {
     return ResponseEntity.ok(ApiResponse.success(roleService.listPermissions()));
-  }
-
-  @PutMapping("/roles/{id}/permissions")
-  @PreAuthorize("hasAuthority('employee:manage-permission')")
-  public ResponseEntity<ApiResponse<RoleResponse>> updatePermissions(
-      @PathVariable Long id, @Valid @RequestBody UpdateRolePermissionsRequest request) {
-    return ResponseEntity.ok(ApiResponse.success(roleService.updatePermissions(id, request)));
   }
 }

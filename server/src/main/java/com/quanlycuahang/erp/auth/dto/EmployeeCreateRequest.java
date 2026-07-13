@@ -10,14 +10,14 @@ public class EmployeeCreateRequest {
   @NotBlank private String username;
 
   @NotBlank
-  @Size(min = 8, message = "Mat khau phai co it nhat 8 ky tu")
+  @Size(min = 8, message = "Mật khẩu phải có ít nhất 8 ký tự")
   private String password;
 
   @NotBlank private String fullName;
 
   private String phone;
 
-  @NotEmpty(message = "Phai chon it nhat 1 vai tro")
+  @NotEmpty(message = "Phải chọn ít nhất 1 vai trò")
   private Set<Long> roleIds;
 
   public String getUsername() {

@@ -73,10 +73,26 @@
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
 
+        <!-- Cache trong tien trinh (Prompt #7, P2 hieu nang) - danh muc/chi nhanh doc rat nhieu,
+             thay doi hiem, khong can chia se qua tenant/instance nhu Redis (SettingsService) nen
+             Caffeine (in-process, khong round-trip mang) phu hop hon. -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
         <!-- Actuator: health check chuan, khong tu viet -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- Prometheus registry (Prompt #8, P2 quan sat) - /actuator/prometheus xuat metric o dinh
+             dang Prometheus scrape duoc (bao gom ca metric nghiep vu tu dinh nghia qua Micrometer,
+             xem BusinessMetrics). -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
         </dependency>
 
         <!-- Migration: Flyway -->
@@ -246,6 +262,98 @@
                             <goal>integration-test</goal>
                             <goal>verify</goal>
                         </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Cong CI (Prompt #1, P0): do coverage tang service/ (nghiep vu chinh) va CHAN build o
+                 phase verify neu duoi nguong - khong tinh controller/dto/entity/repository/config
+                 (interface/getter-setter, coverage khong y nghia). Do THAT sau khi hoan tat Prompt #1
+                 (26 IT test moi + 24 unit test co san) = 37,8% dong lenh tren toan bo service/ (xem
+                 BUGS_FOUND.md/PROJECT_STATE cho danh sach service CHUA co test: StockTakeService,
+                 InventoryService, ProductService, CategoryService, DashboardService, EmployeeService,
+                 AuthService, RoleService, ReportService, VietQrService, ParkedOrderService, cac
+                 platform.service.*, CustomerGroupService/SupplierService/CustomerService,
+                 VoucherService, InvoiceEmailService...). Dat nguong 30% (thap hon 37,8% do that de co
+                 bien do an toan, KHONG phai muc tieu) - roadmap yeu cau toi thieu 60%, sau nang 75%;
+                 se NANG dan nguong nay o cac Prompt sau khi them test, KHONG duoc ha xuong. -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.12</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>prepare-agent-integration</id>
+                        <goals>
+                            <goal>prepare-agent-integration</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report-integration</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report-integration</goal>
+                        </goals>
+                    </execution>
+                    <!-- Da so coverage service/ thuc te den tu *IT.java (failsafe, ghi jacoco-it.exec),
+                         khong phai *Test.java (surefire, ghi jacoco.exec) - phai gop 2 file lai truoc
+                         khi check(), neu khong check() chi doc jacoco.exec mac dinh va luon thay 0%. -->
+                    <execution>
+                        <id>merge-unit-and-it-coverage</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>merge</goal>
+                        </goals>
+                        <configuration>
+                            <fileSets>
+                                <fileSet>
+                                    <directory>${project.build.directory}</directory>
+                                    <includes>
+                                        <include>jacoco.exec</include>
+                                        <include>jacoco-it.exec</include>
+                                    </includes>
+                                </fileSet>
+                            </fileSets>
+                            <destFile>${project.build.directory}/jacoco-merged.exec</destFile>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>check-service-layer-coverage</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <dataFile>${project.build.directory}/jacoco-merged.exec</dataFile>
+                            <includes>
+                                <include>com/quanlycuahang/erp/**/service/**</include>
+                            </includes>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.30</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

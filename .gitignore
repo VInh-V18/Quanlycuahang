@@ -35,3 +35,12 @@ dump.rdb
 
 # --- Backups (scripts/backup.sh) ---
 /backups/
+
+# --- Python / ml-service (Prompt #12) ---
+ml-service/.venv/
+ml-service/**/__pycache__/
+ml-service/.pytest_cache/
+*.pyc
+
+# --- File tam/lock cua ung dung office (khong phai source) ---
+~$*

@@ -42,8 +42,10 @@ public class InventoryTransaction extends TenantScopedEntity {
   @Column(name = "unit_cost")
   private BigDecimal unitCost;
 
-  /** Chi co gia tri voi type=purchase - dung de tim dung dong khi sua gia nhap 1 phieu cu (B4
-   * mo rong, xem AverageCostService.replay()). */
+  /**
+   * Chi co gia tri voi type=purchase - dung de tim dung dong khi sua gia nhap 1 phieu cu (B4 mo
+   * rong, xem AverageCostService.replay()).
+   */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "purchase_order_item_id")
   private PurchaseOrderItem purchaseOrderItem;

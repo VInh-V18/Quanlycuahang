@@ -110,7 +110,7 @@ public class ProductService {
     return productMapper.toResponse(
         productRepository
             .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay san pham")));
+            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm")));
   }
 
   @Transactional
@@ -122,10 +122,10 @@ public class ProductService {
             ? generateSku()
             : request.getSku());
     if (productRepository.existsBySku(product.getSku())) {
-      throw new BusinessRuleException("PRODUCT_DUPLICATE_SKU", "SKU da ton tai");
+      throw new BusinessRuleException("PRODUCT_DUPLICATE_SKU", "SKU đã tồn tại");
     }
     if (product.getBarcode() != null && productRepository.existsByBarcode(product.getBarcode())) {
-      throw new BusinessRuleException("PRODUCT_DUPLICATE_BARCODE", "Barcode da ton tai");
+      throw new BusinessRuleException("PRODUCT_DUPLICATE_BARCODE", "Barcode đã tồn tại");
     }
     return productMapper.toResponse(productRepository.save(product));
   }
@@ -135,7 +135,7 @@ public class ProductService {
     Product product =
         productRepository
             .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay san pham"));
+            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm"));
     BigDecimal oldPrice = product.getSellPrice();
     applyRequest(product, request);
 
@@ -153,7 +153,7 @@ public class ProductService {
   @Transactional
   public void delete(Long id) {
     if (!productRepository.existsById(id)) {
-      throw new ResourceNotFoundException("Khong tim thay san pham");
+      throw new ResourceNotFoundException("Không tìm thấy sản phẩm");
     }
     // Soft delete tu dong qua @SQLDelete tren Product — lich su giao dich giu nguyen (B4).
     productRepository.deleteById(id);
@@ -182,7 +182,7 @@ public class ProductService {
       Category category =
           categoryRepository
               .findById(request.getCategoryId())
-              .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay danh muc"));
+              .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy danh mục"));
       product.setCategory(category);
     } else {
       product.setCategory(null);
@@ -191,8 +191,7 @@ public class ProductService {
 
   private String generateSku() {
     String prefix = settingsService.getValue(null, SettingsService.KEY_SKU_PREFIX, "SP-");
-    long sequence =
-        numberSequenceService.nextValue(TenantContext.get(), NumberSequenceService.SKU_SEQ);
+    long sequence = numberSequenceService.nextValue(NumberSequenceService.SKU_SEQ);
     return prefix + String.format("%06d", sequence);
   }
 }

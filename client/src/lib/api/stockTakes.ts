@@ -19,9 +19,12 @@ export interface StockTake {
   items: StockTakeItem[];
 }
 
-export async function listStockTakes(branchId: number): Promise<ApiSuccess<StockTake[]>> {
+export async function listStockTakes(
+  branchId: number,
+  page = 0,
+): Promise<ApiSuccess<StockTake[]>> {
   const response = await apiClient.get<ApiSuccess<StockTake[]>>("/stock-takes", {
-    params: { branchId, size: 20 },
+    params: { branchId, page, size: 20 },
   });
   return response.data;
 }

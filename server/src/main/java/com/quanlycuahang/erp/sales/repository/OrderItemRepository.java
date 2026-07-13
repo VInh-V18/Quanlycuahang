@@ -1,16 +1,28 @@
 package com.quanlycuahang.erp.sales.repository;
 
 import com.quanlycuahang.erp.sales.entity.OrderItem;
+import jakarta.persistence.LockModeType;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
 
   List<OrderItem> findByOrderId(Long orderId);
+
+  /**
+   * Khoa pessimistic khi doc/sua returnedQuantity trong ReturnService.createReturn() - tranh 2 yeu
+   * cau tra hang dong thoi tren cung 1 dong don doc cung gia tri cu roi cung ghi de (double-refund
+   * + cong kho 2 lan, phat hien khi audit).
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT oi FROM OrderItem oi WHERE oi.id = :id")
+  Optional<OrderItem> findByIdForUpdate(@Param("id") Long id);
 
   @Query(
       value =

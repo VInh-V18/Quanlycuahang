@@ -6,6 +6,7 @@ import com.quanlycuahang.erp.auth.security.JwtAuthenticationFilter;
 import com.quanlycuahang.erp.auth.security.ResourceActionPermissionEvaluator;
 import com.quanlycuahang.erp.auth.security.TenantFilter;
 import com.quanlycuahang.erp.common.web.ApiRateLimitFilter;
+import com.quanlycuahang.erp.common.web.RequestContextMdcFilter;
 import com.quanlycuahang.erp.platform.security.PlatformAdminJwtAuthenticationFilter;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
@@ -42,6 +43,7 @@ public class SecurityConfig {
   private final JwtAuthenticationFilter jwtAuthenticationFilter;
   private final TenantFilter tenantFilter;
   private final ApiRateLimitFilter apiRateLimitFilter;
+  private final RequestContextMdcFilter requestContextMdcFilter;
   private final PlatformAdminJwtAuthenticationFilter platformAdminJwtAuthenticationFilter;
   private final JwtAuthenticationEntryPoint authenticationEntryPoint;
   private final JwtAccessDeniedHandler accessDeniedHandler;
@@ -50,21 +52,23 @@ public class SecurityConfig {
       JwtAuthenticationFilter jwtAuthenticationFilter,
       TenantFilter tenantFilter,
       ApiRateLimitFilter apiRateLimitFilter,
+      RequestContextMdcFilter requestContextMdcFilter,
       PlatformAdminJwtAuthenticationFilter platformAdminJwtAuthenticationFilter,
       JwtAuthenticationEntryPoint authenticationEntryPoint,
       JwtAccessDeniedHandler accessDeniedHandler) {
     this.jwtAuthenticationFilter = jwtAuthenticationFilter;
     this.tenantFilter = tenantFilter;
     this.apiRateLimitFilter = apiRateLimitFilter;
+    this.requestContextMdcFilter = requestContextMdcFilter;
     this.platformAdminJwtAuthenticationFilter = platformAdminJwtAuthenticationFilter;
     this.authenticationEntryPoint = authenticationEntryPoint;
     this.accessDeniedHandler = accessDeniedHandler;
   }
 
   /**
-   * Chain RIENG cho Super Admin - securityMatcher tach han khoi chain con lai (khop truoc do co
-   * @Order thap hon), dung filter/authority rieng (PLATFORM_ADMIN), KHONG dung TenantFilter (Super
-   * Admin khong thuoc tenant nao, xem PlatformAdminJwtAuthenticationFilter).
+   * Chain RIENG cho Super Admin - securityMatcher tach han khoi chain con lai (khop truoc do
+   * co @Order thap hon), dung filter/authority rieng (PLATFORM_ADMIN), KHONG dung TenantFilter
+   * (Super Admin khong thuoc tenant nao, xem PlatformAdminJwtAuthenticationFilter).
    */
   @Bean
   @Order(1)
@@ -84,7 +88,8 @@ public class SecurityConfig {
             eh ->
                 eh.authenticationEntryPoint(authenticationEntryPoint)
                     .accessDeniedHandler(accessDeniedHandler))
-        .addFilterBefore(platformAdminJwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+        .addFilterBefore(
+            platformAdminJwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
         .addFilterAfter(apiRateLimitFilter, PlatformAdminJwtAuthenticationFilter.class);
     return http.build();
   }
@@ -100,11 +105,22 @@ public class SecurityConfig {
                 auth.requestMatchers(
                         "/api/v1/auth/login",
                         "/api/v1/auth/refresh",
-                        "/actuator/health",
-                        "/actuator/info",
+                        // /actuator/** (khong chi health/info nua - Prompt #8 them metrics/
+                        // prometheus): ranh gioi bao mat that su la MANG, khong phai xac thuc o
+                        // day - nginx KHONG proxy /actuator ra Internet va port server khong
+                        // publish ra host (xem docker/nginx.conf + docker-compose.yml), nen
+                        // permitAll o tang ung dung an toan (Prometheus scrape tu container
+                        // khac trong docker-compose network khong the/khong nen mang JWT).
+                        "/actuator/**",
                         "/swagger-ui/**",
                         "/v3/api-docs/**")
                     .permitAll()
+                    // GET /uploads cong khai la CO CHU DICH (da ra soat): file upload hien chi la
+                    // anh QR ngan hang/anh san pham, va anh QR phai hien duoc tren trang tra cuu
+                    // hoa don CONG KHAI (khach quet QR, khong dang nhap - xem InvoiceLookupPage).
+                    // Ten file la UUID ngau nhien (khong doan duoc). Neu sau nay co loai upload
+                    // rieng tu (hop dong, chung tu...) thi KHONG dung chung duong dan nay - phai
+                    // them kiem tra dang nhap + so huu tenant rieng.
                     .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/uploads/**")
                     .permitAll()
                     .requestMatchers(
@@ -121,7 +137,8 @@ public class SecurityConfig {
                     .accessDeniedHandler(accessDeniedHandler))
         .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
         .addFilterAfter(tenantFilter, JwtAuthenticationFilter.class)
-        .addFilterAfter(apiRateLimitFilter, TenantFilter.class);
+        .addFilterAfter(requestContextMdcFilter, TenantFilter.class)
+        .addFilterAfter(apiRateLimitFilter, RequestContextMdcFilter.class);
     return http.build();
   }
 
@@ -165,5 +182,34 @@ public class SecurityConfig {
     DefaultMethodSecurityExpressionHandler handler = new DefaultMethodSecurityExpressionHandler();
     handler.setPermissionEvaluator(permissionEvaluator);
     return handler;
+  }
+
+  /**
+   * Tat dang ky filter TU DONG cua Spring Boot cho ApiRateLimitFilter - filter nay la @Component
+   * (de duoc inject vao day) nen Boot mac dinh tu dang ky them 1 ban nua vao filter chain goc,
+   * NGOAI vi tri da gan thu cong trong 2 SecurityFilterChain o tren (sau filter xac thuc, vi can
+   * username). Hien khong gay loi CHI VI OncePerRequestFilter tu chan chay lap trong 1 request -
+   * tat han o day de khong phu thuoc vao hieu ung phu do (phat hien khi rieng soat).
+   */
+  @Bean
+  public org.springframework.boot.web.servlet.FilterRegistrationBean<ApiRateLimitFilter>
+      apiRateLimitFilterRegistration(ApiRateLimitFilter filter) {
+    var registration = new org.springframework.boot.web.servlet.FilterRegistrationBean<>(filter);
+    registration.setEnabled(false);
+    return registration;
+  }
+
+  /**
+   * Tat dang ky filter TU DONG cua Spring Boot cho RequestContextMdcFilter - cung ly do voi
+   * ApiRateLimitFilter o tren: filter nay PHAI chay SAU JwtAuthenticationFilter/TenantFilter (can
+   * TenantContext/SecurityContext da duoc gan) trong chuoi filter cua Spring Security, khong phai o
+   * vi tri Spring Boot tu dong xep (truoc ca springSecurityFilterChain).
+   */
+  @Bean
+  public org.springframework.boot.web.servlet.FilterRegistrationBean<RequestContextMdcFilter>
+      requestContextMdcFilterRegistration(RequestContextMdcFilter filter) {
+    var registration = new org.springframework.boot.web.servlet.FilterRegistrationBean<>(filter);
+    registration.setEnabled(false);
+    return registration;
   }
 }

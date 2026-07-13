@@ -24,6 +24,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { getOrder } from "@/lib/api/orders";
 import { createReturn } from "@/lib/api/returns";
 import { getApiErrorMessage } from "@/lib/http/errors";
+import { formatDateTime } from "@/lib/utils";
 
 const numberFormatter = new Intl.NumberFormat("vi-VN");
 
@@ -100,7 +101,7 @@ export function ReturnCreatePage() {
         <div>
           <h1 className="text-2xl font-bold">Tạo phiếu trả hàng</h1>
           <p className="text-sm text-muted-foreground">
-            Từ hóa đơn {order.orderNumber} · {new Date(order.createdAt).toLocaleString("vi-VN")}
+            Từ hóa đơn {order.orderNumber} · {formatDateTime(order.createdAt)}
           </p>
         </div>
         <div className="flex gap-2">

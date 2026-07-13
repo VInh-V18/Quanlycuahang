@@ -19,7 +19,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 /**
  * Rieng cho SecurityFilterChain /api/v1/platform-admin/** — chi chap nhan token mang claim "scope"
  * = platform_admin (sinh boi JwtService.generatePlatformAdminAccessToken), tu choi token cua tenant
- * User du ky dung chung 1 khoa HMAC. Khong dung TenantContext (PlatformAdmin khong thuoc tenant nao).
+ * User du ky dung chung 1 khoa HMAC. Khong dung TenantContext (PlatformAdmin khong thuoc tenant
+ * nao).
  */
 @Component
 public class PlatformAdminJwtAuthenticationFilter extends OncePerRequestFilter {

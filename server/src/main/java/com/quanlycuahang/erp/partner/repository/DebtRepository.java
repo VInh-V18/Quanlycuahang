@@ -1,11 +1,13 @@
 package com.quanlycuahang.erp.partner.repository;
 
 import com.quanlycuahang.erp.partner.entity.Debt;
+import jakarta.persistence.LockModeType;
 import java.math.BigDecimal;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -23,6 +25,23 @@ public interface DebtRepository extends JpaRepository<Debt, Long> {
           + "WHERE d.supplier.id = :supplierId AND d.direction = 'payable' AND d.amount > 0")
   BigDecimal sumOutstandingBySupplierId(@Param("supplierId") Long supplierId);
 
+  /** Tong cong no con du cua 1 khach hang - dung de doi chieu voi Customer.debtLimit khi ban no. */
+  @Query(
+      "SELECT COALESCE(SUM(d.amount), 0) FROM Debt d "
+          + "WHERE d.customer.id = :customerId AND d.direction = 'receivable' AND d.amount > 0")
+  BigDecimal sumOutstandingByCustomerId(@Param("customerId") Long customerId);
+
+  /**
+   * Ban tong hop theo danh sach supplierId (gom nhieu truy van rieng le thanh 1) - dung cho
+   * SupplierService.list() de tranh N+1 (truoc day goi sumOutstandingBySupplierId rieng cho tung
+   * dong trong trang, phat hien khi rieng soat hieu nang).
+   */
+  @Query(
+      "SELECT d.supplier.id, COALESCE(SUM(d.amount), 0) FROM Debt d "
+          + "WHERE d.supplier.id IN :supplierIds AND d.direction = 'payable' AND d.amount > 0 "
+          + "GROUP BY d.supplier.id")
+  List<Object[]> sumOutstandingBySupplierIds(@Param("supplierIds") List<Long> supplierIds);
+
   /**
    * Tuoi no tinh tu ngay tao Debt (created_at) den hien tai, chia 4 muc chuan (0-30/31-60/61-90/
    * >90 ngay) — chi tinh cong no con du (amount > 0), theo dung chieu receivable (KH no) hoac
@@ -37,7 +56,8 @@ public interface DebtRepository extends JpaRepository<Debt, Long> {
               + "  ELSE '90+' END AS bucket, "
               + "COALESCE(SUM(d.amount), 0) AS total_amount, COUNT(*) AS debt_count "
               + "FROM debts d "
-              + "WHERE d.direction = :direction AND d.amount > 0 AND d.tenant_id = :tenantId "
+              + "WHERE d.direction = :direction AND d.amount > 0 AND d.deleted_at IS NULL "
+              + "AND d.tenant_id = :tenantId "
               + "GROUP BY 1 "
               + "ORDER BY MIN(EXTRACT(DAY FROM now() - d.created_at))",
       nativeQuery = true)
@@ -74,11 +94,28 @@ public interface DebtRepository extends JpaRepository<Debt, Long> {
   List<Object[]> findAgingByPartner(
       @Param("direction") String direction, @Param("tenantId") Long tenantId);
 
+  /**
+   * Khoa pessimistic (SELECT ... FOR UPDATE) cac dong no con du se bi tru trong recordPayment - chi
+   * dung 1 noi duy nhat (DebtService.recordPayment), khong co @Version tren Debt truoc do nen 2 lan
+   * ghi nhan thanh toan dong thoi cho cung doi tac co the doc cung so du cu va mat cap nhat (phat
+   * hien khi review bao mat/du lieu tai chinh toan he thong).
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
   List<Debt> findByCustomerIdAndDirectionAndAmountGreaterThanOrderByCreatedAtAsc(
       Long customerId, String direction, java.math.BigDecimal minAmount);
 
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
   List<Debt> findBySupplierIdAndDirectionAndAmountGreaterThanOrderByCreatedAtAsc(
       Long supplierId, String direction, java.math.BigDecimal minAmount);
+
+  /**
+   * Khoa pessimistic ban Debt gan voi 1 don hang/phieu nhap - dung trong
+   * ReturnService.createReturn() va PurchaseOrderService.updateItemPrice() de tranh doc so du cu
+   * khi DebtService.recordPayment() dang khoa/sua cung dong Debt do o luong khac (phat hien khi
+   * rieng soat).
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  List<Debt> findByReferenceTypeAndReferenceIdOrderByIdAsc(String referenceType, Long referenceId);
 
   /**
    * Lich su doi chieu 1 doi tac: hop nhat 2 nguon — luc phat sinh no (debts.original_amount, duong)

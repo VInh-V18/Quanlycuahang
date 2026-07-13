@@ -1,16 +1,84 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { AlertTriangle, Plus } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { useAppSelector } from "@/store/hooks";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/components/ui/use-toast";
+import { AiChatWidget } from "@/components/ai/AiChatWidget";
 import { DataTable, type DataTableColumn } from "@/components/common/DataTable";
 import { Money } from "@/components/common/Money";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { useCurrentBranchId } from "@/lib/hooks/useCurrentBranchId";
 import { cn } from "@/lib/utils";
 import { getDashboardSummary, type LowStockItem, type RecentOrder } from "@/lib/api/dashboard";
+import { getOpenReconciliationFindingsCount, runReconciliation } from "@/lib/api/reconciliation";
+import { getApiErrorMessage } from "@/lib/http/errors";
 import type { TopProduct } from "@/lib/api/reports";
+
+/** Canh bao doi soat toan ven du lieu (Prompt #6) — chi owner/manager (quyen reconciliation:run)
+ * thay, dung PermissionGate se an toan bo Card nay ngay ca khi query bi 403 (nen chan luon tu goc
+ * bang kiem tra quyen truoc khi goi API, khong doi loi 403 roi moi an). */
+function ReconciliationAlert() {
+  const permissions = useAppSelector((state) => state.auth.permissions);
+  const canView = permissions.includes("reconciliation:run");
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const openCountQuery = useQuery({
+    queryKey: ["reconciliation", "open-count"],
+    queryFn: getOpenReconciliationFindingsCount,
+    enabled: canView,
+  });
+
+  const runMutation = useMutation({
+    mutationFn: runReconciliation,
+    onSuccess: (result) => {
+      toast({
+        title: "Đã chạy đối soát",
+        description:
+          result.findingsCount > 0
+            ? `Phát hiện ${result.findingsCount} chỗ lệch mới`
+            : "Không phát hiện chỗ lệch nào",
+      });
+      queryClient.invalidateQueries({ queryKey: ["reconciliation", "open-count"] });
+    },
+    onError: (err) => {
+      toast({ variant: "destructive", title: "Không thể chạy đối soát", description: getApiErrorMessage(err) });
+    },
+  });
+
+  if (!canView || !openCountQuery.data || openCountQuery.data <= 0) {
+    return null;
+  }
+
+  return (
+    <Card className="border-destructive/50 bg-destructive/5">
+      <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
+        <div className="flex items-center gap-3">
+          <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" />
+          <div>
+            <p className="text-sm font-semibold text-destructive">
+              Phát hiện {openCountQuery.data} chỗ lệch dữ liệu chưa xử lý
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Đối soát toàn vẹn dữ liệu (tồn kho, công nợ, đơn hàng...) tìm thấy chênh lệch cần kiểm tra.
+            </p>
+          </div>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={runMutation.isPending}
+          onClick={() => runMutation.mutate()}
+        >
+          Chạy đối soát ngay
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
 
 const CHART_COLOR = "hsl(168 83% 26%)";
 const numberFormatter = new Intl.NumberFormat("vi-VN");
@@ -93,6 +161,8 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      <ReconciliationAlert />
+
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Tổng quan hôm nay</h1>
@@ -214,6 +284,8 @@ export function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      <AiChatWidget />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>

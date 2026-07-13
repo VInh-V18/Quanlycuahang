@@ -49,14 +49,14 @@ public class SettingsController {
 
   /**
    * Ten/khau hieu cua hang hien thi CONG KHAI (Sidebar, trang dang nhap luc chua dang nhap) — khong
-   * doi hoi quyen gi, permitAll trong SecurityConfig. Chi tra dung 2 truong nay, khong ghep them cau
-   * hinh nhay cam khac cua Settings.
+   * doi hoi quyen gi, permitAll trong SecurityConfig. Chi tra dung 2 truong nay, khong ghep them
+   * cau hinh nhay cam khac cua Settings.
    *
    * <p>Multi-tenant: luc chua dang nhap (trang Dang nhap) khong co JWT nen khong co TenantContext —
    * he thong dung 1 trang dang nhap chung cho moi tenant (khong chon "cua hang nao" truoc), nen
-   * khong the biet phai tra ten cua tenant nao. Neu van goi settingsService luc nay, Hibernate se bo
-   * qua @Filter tenant (chi bat khi co TenantContext) va co the tra ve ten cua MOT TENANT BAT KY —
-   * ro ri nham cua hang. Vi vay chua dang nhap thi luon tra rong (Frontend tu hien ten mac dinh
+   * khong the biet phai tra ten cua tenant nao. Neu van goi settingsService luc nay, Hibernate se
+   * bo qua @Filter tenant (chi bat khi co TenantContext) va co the tra ve ten cua MOT TENANT BAT KY
+   * — ro ri nham cua hang. Vi vay chua dang nhap thi luon tra rong (Frontend tu hien ten mac dinh
    * chung); da dang nhap (goi lai sau khi vao he thong, co JWT) thi tra dung ten tenant cua nguoi
    * dang nhap nhu binh thuong.
    */

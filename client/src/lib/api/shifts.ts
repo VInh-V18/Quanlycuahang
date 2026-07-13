@@ -48,6 +48,11 @@ export async function getCurrentShift(): Promise<ShiftDetail | null> {
   return response.data.data ?? null;
 }
 
+export async function getShiftById(id: number): Promise<ShiftDetail> {
+  const response = await apiClient.get<ApiSuccess<ShiftDetail>>(`/shifts/${id}`);
+  return response.data.data;
+}
+
 export async function closeShift(
   id: number,
   actualCash: number,
@@ -71,11 +76,6 @@ export async function listShiftHistory(
 ): Promise<ApiSuccess<ShiftSummary[]>> {
   const response = await apiClient.get<ApiSuccess<ShiftSummary[]>>("/shifts", { params });
   return response.data;
-}
-
-export async function getShiftDetail(id: number): Promise<ShiftDetail> {
-  const response = await apiClient.get<ApiSuccess<ShiftDetail>>(`/shifts/${id}`);
-  return response.data.data;
 }
 
 export async function addCashTransaction(

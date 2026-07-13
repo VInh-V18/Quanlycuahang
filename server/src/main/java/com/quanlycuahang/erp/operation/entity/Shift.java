@@ -9,6 +9,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import org.hibernate.annotations.SQLDelete;
@@ -19,6 +20,13 @@ import org.hibernate.annotations.Where;
 @SQLDelete(sql = "UPDATE shifts SET deleted_at = now() WHERE id = ?")
 @Where(clause = "deleted_at IS NULL")
 public class Shift extends TenantScopedEntity {
+
+  // Chong dong ca 2 lan dong thoi (khong co truoc day - 2 request cung dong 1 ca co the cung doc
+  // status="open", request thu 2 am tham ghi de actualCash/discrepancy/note thay vi bao loi ro
+  // rang - phat hien khi rieng soat, giong pattern @Version da co san tren Inventory/Voucher).
+  @Version
+  @Column(name = "version", nullable = false)
+  private Long version;
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "branch_id", nullable = false)
@@ -48,6 +56,14 @@ public class Shift extends TenantScopedEntity {
 
   @Column(name = "closed_at")
   private OffsetDateTime closedAt;
+
+  public Long getVersion() {
+    return version;
+  }
+
+  public void setVersion(Long version) {
+    this.version = version;
+  }
 
   public Branch getBranch() {
     return branch;

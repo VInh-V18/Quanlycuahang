@@ -34,20 +34,20 @@ public class VoucherService {
         voucherRepository
             .findByCode(code)
             .orElseThrow(
-                () -> new BusinessRuleException("VOUCHER_INVALID", "Voucher khong ton tai"));
+                () -> new BusinessRuleException("VOUCHER_INVALID", "Voucher không tồn tại"));
 
     if (!voucher.isActive()) {
-      throw new BusinessRuleException("VOUCHER_INVALID", "Voucher khong con hieu luc");
+      throw new BusinessRuleException("VOUCHER_INVALID", "Voucher không còn hiệu lực");
     }
     if (voucher.getExpiresAt() != null && voucher.getExpiresAt().isBefore(OffsetDateTime.now())) {
-      throw new BusinessRuleException("VOUCHER_INVALID", "Voucher da het han");
+      throw new BusinessRuleException("VOUCHER_INVALID", "Voucher đã hết hạn");
     }
     if (voucher.getUsedCount() >= voucher.getMaxUsage()) {
-      throw new BusinessRuleException("VOUCHER_INVALID", "Voucher da het luot su dung");
+      throw new BusinessRuleException("VOUCHER_INVALID", "Voucher đã hết lượt sử dụng");
     }
     if (orderSubtotal.compareTo(voucher.getMinOrderAmount()) < 0) {
       throw new BusinessRuleException(
-          "VOUCHER_INVALID", "Don hang chua dat gia tri toi thieu de ap dung voucher");
+          "VOUCHER_INVALID", "Đơn hàng chưa đạt giá trị tối thiểu để áp dụng voucher");
     }
 
     BigDecimal discountAmount =

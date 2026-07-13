@@ -55,7 +55,7 @@ Cột "Chuỗi authority" là giá trị lưu trong bảng `permissions.code`, d
 |---|---|:-:|:-:|:-:|:-:|:-:|:-:|
 | `order:view` | Xem đơn hàng | ✅ | ✅ | ✅ (đơn của mình/ca) | ✅ (đơn của mình) | — | ✅ |
 | `order:create` | Tạo đơn (bán hàng) | ✅ | ✅ | ✅ | ✅ | — | — |
-| `order:void` | Hủy đơn đã hoàn tất (trong ngày) | ✅ | ✅ | — | — | — | — |
+| `order:void` ⚠️ | Hủy đơn đã hoàn tất (trong ngày) — **mồ côi từ Prompt #10 (P3)**: endpoint duy nhất dùng quyền này (`POST /orders/{id}/cancel`) đã bị xoá (dead code, không FE nào gọi), permission vẫn còn trong DB seed (đã chạy, không sửa) nhưng không còn code nào kiểm tra | ✅ | ✅ | — | — | — | — |
 | `order:park` | Treo/mở lại đơn | ✅ | ✅ | ✅ | ✅ | — | — |
 | `return:view` | Xem phiếu trả hàng | ✅ | ✅ | ✅ | ✅ | — | ✅ |
 | `return:create` | Tạo phiếu trả hàng | ✅ | ✅ | ✅ | ✅ | — | — |

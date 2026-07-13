@@ -13,11 +13,45 @@ spring:
     properties:
       hibernate:
         default_batch_fetch_size: 50
+        # Gom cac cau UPDATE cung loai thanh 1 batch JDBC (vd submitCounts cap nhat hang tram dong
+        # kiem ke 1 luot). KHONG co tac dung voi INSERT vi ID dang IDENTITY (Hibernate phai doc lai
+        # khoa tu sinh tung dong) - phan INSERT da giam tai bang saveAll() o tang repository.
+        order_updates: true
         jdbc:
           time_zone: UTC
+          batch_size: 30
+  datasource:
+    hikari:
+      # cong thuc chuan connections = so core*2 + so spindle (o day gia dinh SSD, spindle=1) - chua
+      # biet cau hinh host that su (VPS cu the), chon 10 lam mac dinh AN TOAN cho may nho/vua (~2-4
+      # core) roi CAN chinh lai qua bien moi truong khi biet so core that cua may chu san xuat
+      # (Prompt #7, P2 hieu nang - truoc day dung mac dinh ngam cua Spring Boot, khong ai chu dong
+      # quyet dinh con so nay).
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:10}
+      minimum-idle: ${DB_POOL_MIN_IDLE:5}
+      connection-timeout: 10000
+      idle-timeout: 300000
+      max-lifetime: 1800000
+      # Canh bao (khong dong ket noi) neu 1 connection bi giu qua 60s ma khong tra ve pool - dau
+      # hieu ro nhat cua 1 transaction/luong quen dong hoac deadlock cho o tang ung dung.
+      leak-detection-threshold: 60000
+      data-source-properties:
+        # statement_timeout muc PHIEN (session-level, Postgres tu huy cau lenh) - luoi an toan cuoi
+        # cung chan 1 truy van "chay quen" (vd bao cao quet nham toan bang) chiem giu connection vo
+        # han, khong lien quan gi @Transactional timeout (dung cho transaction, khong bat buoc query
+        # don le ben trong phai xong truoc 1 moc).
+        options: -c statement_timeout=30000
   flyway:
     enabled: true
     locations: classpath:db/migration
+    placeholders:
+      # V30 (Prompt #11, AI Assistant) - mat khau role Postgres chi-doc rieng cho AI, doc tu bien
+      # moi truong thay vi hardcode vao file migration (se bi commit vao repo). Da xac nhan KHONG
+      # co file migration nao truoc day chua chuoi "${...}" trung cu phap placeholder cua Flyway
+      # (tranh sai lech checksum voi migration da chay). Mac dinh CHI danh cho dev cuc bo (giong
+      # JWT_SECRET local) - BAT BUOC dat AI_DB_READONLY_PASSWORD that o production (xem
+      # README_DEPLOY.md).
+      aiReadonlyPassword: ${AI_DB_READONLY_PASSWORD:change-me-ai-readonly-dev-only}
   data:
     redis:
       timeout: 2000ms
@@ -44,16 +78,33 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        # metrics/prometheus moi them (Prompt #8, P2 quan sat) - AN TOAN de lo chi tiet vi
+        # /actuator/** KHONG duoc nginx proxy ra Internet (xem docker/nginx.conf, chi proxy
+        # /api/) va port server KHONG publish ra host (xem docker-compose.yml) — ranh gioi bao
+        # mat that su la MANG (chi container/may noi bo trong docker-compose network goi duoc),
+        # khong phai xac thuc o tang ung dung (Prometheus scrape khong mang JWT).
+        include: health,info,metrics,prometheus
   endpoint:
     health:
-      show-details: when-authorized
+      # always (khong phai when-authorized) - cung ly do o tren: endpoint nay da duoc bao ve bang
+      # cach ly mang, khong phai bang xac thuc (Spring Security se khong bao gio thay "authorized
+      # principal" vi actuator permitAll + API stateless JWT), when-authorized se KHONG BAO GIO
+      # hien chi tiet duoc trong thuc te, gay hieu nham la da an toan trong khi that ra la vo dung.
+      show-details: always
   health:
     mail:
       # Email hoa don la best-effort, gui sau khi transaction ban hang da commit (Phase 9) —
       # SMTP gian doan KHONG duoc phep keo /actuator/health cua toan he thong xuong DOWN
       # (readiness probe se loai bo mot instance van dang ban hang binh thuong).
       enabled: false
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      # Bat histogram buckets cho http.server.requests (KHONG bat mac dinh) - can de Grafana tinh
+      # duoc p95/p99 qua histogram_quantile(), khong chi trung binh (Prompt #8, P2 quan sat).
+      percentiles-histogram:
+        http.server.requests: true
 
 springdoc:
   api-docs:
@@ -78,3 +129,39 @@ app:
     account-number: ${VIETQR_ACCOUNT_NUMBER:0000000000}
     merchant-name: ${VIETQR_MERCHANT_NAME:CUA HANG}
     merchant-city: ${VIETQR_MERCHANT_CITY:HA NOI}
+  ai:
+    # Prompt #11 - AI Assistant. Tang an toan: pool ket noi RIENG (khong dung chung Hibernate/JPA
+    # DataSource) bang role fruithouse_ai_readonly (V30) - chi SELECT tren 4 view whitelist, khong
+    # bao gio thay bang goc. Rat it connection (3) vi day la tinh nang phu, khong phai luong nghiep
+    # vu chinh, khong can chiem tai nguyen cua pool chinh (10 connection, Prompt #7).
+    readonly-datasource:
+      jdbc-url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:quanlycuahang}
+      username: ${AI_DB_READONLY_USERNAME:fruithouse_ai_readonly}
+      password: ${AI_DB_READONLY_PASSWORD:change-me-ai-readonly-dev-only}
+      maximum-pool-size: 3
+    # Ma hoa AES-256-GCM khoa API cua nha cung cap AI luc luu vao settings (tung tenant tu cau
+    # hinh khoa rieng) - khoa goc (master key) o day, KHAC voi khoa API cua tung tenant, chi dung
+    # de ma hoa/giai ma khi doc/ghi settings, khong bao gio gui di dau. BAT BUOC dat
+    # AI_SETTINGS_ENCRYPTION_KEY that (32 byte, base64) o production - xem README_DEPLOY.md.
+    settings-encryption-key: ${AI_SETTINGS_ENCRYPTION_KEY:}
+    provider:
+      # Model mac dinh cho hoi dap thuong ngay (widget chat Dashboard, Prompt #12 chuyen sang tang
+      # NHANH/RE hon vi da co streaming + lich su hoi thoai lam da so cau hoi don gian, khong can
+      # model manh nhat). De o day (bien moi truong) thay vi hardcode trong code, de doi khi
+      # Anthropic ra model moi ma khong can build lai. CAN KIEM CHUNG LAI ten model chinh xac voi
+      # tai lieu Anthropic hien tai luc trien khai that (docs.anthropic.com) - gia tri duoi day la
+      # ten model dang dung trong phien lam viec nay, CHUA duoc xac nhan doc duoc tu 1 lan goi API
+      # Claude that (khong co API key that trong sandbox nay, xem ClaudeAiProvider Javadoc).
+      default-model: ${AI_DEFAULT_MODEL:claude-haiku-4-5-20251001}
+      # Model tang MANH hon, dung rieng cho "giai thich bao cao" (AiProvider.explain, Prompt #12) -
+      # phan tich phuc tap hon cau hoi thuong, chap nhan cham/dat hon de doi lay chat luong.
+      advanced-model: ${AI_ADVANCED_MODEL:claude-sonnet-5}
+      timeout-seconds: 30
+    ml-service:
+      # Dich vu Python rieng (FastAPI + scikit-learn, xem ml-service/) tinh du bao nhap hang nang
+      # cao (IsolationForest loc ngay ban bat thuong) - noi bo, KHONG expose port ra host (chi goi
+      # qua ten container trong docker network, xem docker-compose.yml). Timeout NGAN (5s, khac
+      # 30s cua provider.timeout-seconds) vi day la dich vu noi bo cung mang, khong phai API ngoai
+      # qua Internet - AiForecastService tu dong fallback ve cong thuc don gian neu qua han.
+      base-url: ${AI_ML_SERVICE_URL:http://ml-service:8000}
+      timeout-seconds: 5

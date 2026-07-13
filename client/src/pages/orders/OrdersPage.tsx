@@ -23,6 +23,7 @@ import { Money } from "@/components/common/Money";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { exportOrders, listOrders, type OrderListItem } from "@/lib/api/orders";
 import { useCurrentBranchId } from "@/lib/hooks/useCurrentBranchId";
+import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import { getApiErrorMessage } from "@/lib/http/errors";
 
 const PAGE_SIZE = 20;
@@ -41,17 +42,19 @@ export function OrdersPage() {
     return { from: today, to: today };
   });
 
+  const debouncedSearch = useDebouncedValue(search);
+
   const params = useMemo(
     () => ({
       branchId,
       page,
       size: PAGE_SIZE,
-      search,
+      search: debouncedSearch,
       status: status === "all" ? undefined : status,
       from: toIsoDate(range.from),
       to: toIsoDate(range.to),
     }),
-    [branchId, page, search, status, range],
+    [branchId, page, debouncedSearch, status, range],
   );
 
   const { data, isLoading, isError, error } = useQuery({

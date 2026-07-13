@@ -2,6 +2,7 @@ package com.quanlycuahang.erp.common.exception;
 
 import com.quanlycuahang.erp.common.dto.ApiError;
 import com.quanlycuahang.erp.common.dto.ApiResponse;
+import jakarta.persistence.EntityNotFoundException;
 import java.util.HashMap;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -10,11 +11,14 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * Xu ly tap trung moi exception thanh response chuan D2. Khong de exception tho lot ra ngoai — moi
@@ -46,10 +50,13 @@ public class GlobalExceptionHandler {
   public ResponseEntity<ApiResponse<Void>> handleOptimisticLock(
       OptimisticLockingFailureException ex) {
     log.warn("Optimistic lock conflict: {}", ex.getMessage());
+    // Thong bao chung (khong noi rieng "san pham") - @Version (chong ghi de dong thoi) gio dung
+    // tren nhieu Entity khac nhau (Inventory, Voucher, Shift...), khong chi ton kho; thong bao cu
+    // ("San pham vua het hang") gay hieu nham khi xung dot thuc su la o dong ca lam viec/voucher.
     ApiError error =
         new ApiError(
-            "PRODUCT_OUT_OF_STOCK",
-            "Sản phẩm vừa hết hàng hoặc đang được cập nhật, vui lòng thử lại",
+            "CONCURRENT_UPDATE_CONFLICT",
+            "Dữ liệu vừa được cập nhật bởi thao tác khác, vui lòng tải lại và thử lại",
             Map.of());
     return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error(error));
   }
@@ -74,6 +81,52 @@ public class GlobalExceptionHandler {
     ApiError error =
         new ApiError("AUTH_UNAUTHENTICATED", "Chưa đăng nhập hoặc phiên đã hết hạn", Map.of());
     return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(error));
+  }
+
+  /**
+   * Duong dan khong ton tai (endpoint da bi xoa/doi cho, hoac client goi sai URL) - truoc day roi
+   * vao handleUnexpected() ben duoi, tra ve nham 500 INTERNAL_ERROR thay vi 404 dung ban chat (phat
+   * hien khi rieng soat: sau khi chuyen 1 endpoint sang duong khac, goi lai duong cu tra ve 500).
+   */
+  @ExceptionHandler(NoResourceFoundException.class)
+  public ResponseEntity<ApiResponse<Void>> handleNoResourceFound(NoResourceFoundException ex) {
+    ApiError error = new ApiError("NOT_FOUND", "Không tìm thấy đường dẫn này", Map.of());
+    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error(error));
+  }
+
+  /**
+   * Goi dung method HTTP khong duoc ho tro cho duong dan nay (vd POST vao 1 endpoint chi nhan GET)
+   * - cung truoc day roi vao handleUnexpected() thanh 500.
+   */
+  @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+  public ResponseEntity<ApiResponse<Void>> handleMethodNotSupported(
+      HttpRequestMethodNotSupportedException ex) {
+    ApiError error =
+        new ApiError(
+            "METHOD_NOT_ALLOWED", "Phương thức không được hỗ trợ cho đường dẫn này", Map.of());
+    return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(ApiResponse.error(error));
+  }
+
+  /**
+   * Body request khong phai JSON hop le (thieu, sai dinh dang, encoding loi...) - loi cua CLIENT
+   * (400), khong phai loi he thong (500) nhu truoc day.
+   */
+  @ExceptionHandler(HttpMessageNotReadableException.class)
+  public ResponseEntity<ApiResponse<Void>> handleMessageNotReadable(
+      HttpMessageNotReadableException ex) {
+    log.warn("Malformed request body: {}", ex.getMessage());
+    ApiError error = new ApiError("MALFORMED_REQUEST", "Dữ liệu gửi lên không hợp lệ", Map.of());
+    return ResponseEntity.badRequest().body(ApiResponse.error(error));
+  }
+
+  /**
+   * EntityManager.getReference()/TenantAwareRepositoryImpl.getReferenceById() nem ra khi tham chieu
+   * toi 1 dong khong ton tai (hoac thuoc tenant khac) - loi CLIENT (404), khong phai 500.
+   */
+  @ExceptionHandler(EntityNotFoundException.class)
+  public ResponseEntity<ApiResponse<Void>> handleEntityNotFound(EntityNotFoundException ex) {
+    ApiError error = new ApiError("NOT_FOUND", "Không tìm thấy dữ liệu", Map.of());
+    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error(error));
   }
 
   @ExceptionHandler(Exception.class)

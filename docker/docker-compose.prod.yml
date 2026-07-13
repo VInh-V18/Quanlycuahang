@@ -1,0 +1,35 @@
+# Override san xuat cho docker-compose.yml (KHONG phai file thay the — docker-compose.yml da la
+# cau hinh production-ready dung chung cho ca 2 kich ban VPS/LAN, xem comment dau file do). File
+# nay CHI bo sung hardening rieng cho moi truong production that (restart chac chan, gioi han tai
+# nguyen tranh 1 container treo lam sap ca may chu) ma khong lap lai toan bo cau hinh.
+#
+# Chay: docker compose --env-file .env -f docker/docker-compose.yml -f docker/docker-compose.prod.yml up -d --build
+
+services:
+  postgres:
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  redis:
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  server:
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  web:
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 256m

@@ -7,6 +7,7 @@ import com.quanlycuahang.erp.auth.security.AuthException;
 import com.quanlycuahang.erp.auth.security.AuthTokens;
 import com.quanlycuahang.erp.auth.service.AuthService;
 import com.quanlycuahang.erp.common.dto.ApiResponse;
+import com.quanlycuahang.erp.common.web.ClientIpResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.time.Duration;
@@ -46,7 +47,8 @@ public class AuthController {
   public ResponseEntity<ApiResponse<AccessTokenResponse>> login(
       @Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
     AuthTokens tokens =
-        authService.login(request.getUsername(), request.getPassword(), clientIp(httpRequest));
+        authService.login(
+            request.getUsername(), request.getPassword(), ClientIpResolver.resolve(httpRequest));
     return withRefreshCookie(tokens);
   }
 
@@ -99,13 +101,5 @@ public class AuthController {
     return ResponseEntity.ok()
         .header(HttpHeaders.SET_COOKIE, cookie.toString())
         .body(ApiResponse.success(new AccessTokenResponse(tokens.accessToken())));
-  }
-
-  private String clientIp(HttpServletRequest request) {
-    String forwardedFor = request.getHeader("X-Forwarded-For");
-    if (forwardedFor != null && !forwardedFor.isBlank()) {
-      return forwardedFor.split(",")[0].trim();
-    }
-    return request.getRemoteAddr();
   }
 }

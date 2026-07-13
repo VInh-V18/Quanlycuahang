@@ -11,7 +11,7 @@ public class EmployeeUpdateRequest {
 
   private String phone;
 
-  @NotEmpty(message = "Phai chon it nhat 1 vai tro")
+  @NotEmpty(message = "Phải chọn ít nhất 1 vai trò")
   private Set<Long> roleIds;
 
   @NotNull private Boolean active;

@@ -7,6 +7,7 @@ import com.quanlycuahang.erp.auth.security.AuthTokens;
 import com.quanlycuahang.erp.auth.security.JwtService;
 import com.quanlycuahang.erp.auth.security.RefreshTokenService;
 import com.quanlycuahang.erp.common.exception.BusinessRuleException;
+import com.quanlycuahang.erp.common.metrics.BusinessMetrics;
 import com.quanlycuahang.erp.common.web.RateLimitService;
 import com.quanlycuahang.erp.system.service.SettingsService;
 import io.jsonwebtoken.Claims;
@@ -14,6 +15,8 @@ import io.jsonwebtoken.JwtException;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -34,6 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AuthService {
 
+  private static final Logger log = LoggerFactory.getLogger(AuthService.class);
   private static final Duration LOGIN_RATE_LIMIT_WINDOW = Duration.ofMinutes(15);
 
   private final AuthenticationManager authenticationManager;
@@ -44,6 +48,7 @@ public class AuthService {
   private final RateLimitService rateLimitService;
   private final PasswordEncoder passwordEncoder;
   private final SettingsService settingsService;
+  private final BusinessMetrics businessMetrics;
 
   public AuthService(
       AuthenticationManager authenticationManager,
@@ -53,7 +58,8 @@ public class AuthService {
       RefreshTokenService refreshTokenService,
       RateLimitService rateLimitService,
       PasswordEncoder passwordEncoder,
-      SettingsService settingsService) {
+      SettingsService settingsService,
+      BusinessMetrics businessMetrics) {
     this.authenticationManager = authenticationManager;
     this.userDetailsService = userDetailsService;
     this.userRepository = userRepository;
@@ -62,21 +68,49 @@ public class AuthService {
     this.rateLimitService = rateLimitService;
     this.passwordEncoder = passwordEncoder;
     this.settingsService = settingsService;
+    this.businessMetrics = businessMetrics;
   }
 
   /**
-   * @Transactional: requireTenantId() doc user.getTenant().isActive() qua quan he @ManyToOne LAZY
-   * - can Session con mo de Hibernate lazy-load Tenant (khac getTenant().getId() truoc day, luon co
+   * @Transactional: requireTenantId() doc user.getTenant().isActive() qua quan he @ManyToOne LAZY -
+   * can Session con mo de Hibernate lazy-load Tenant (khac getTenant().getId() truoc day, luon co
    * san tu FK khong can lazy-load) - thieu annotation nay se nem LazyInitializationException.
    */
   @Transactional(readOnly = true)
   public AuthTokens login(String username, String password, String clientIp) {
+    // TenantContext CHUA duoc gan luc nay (request nay chua co JWT) - khong the dung
+    // settingsService.getValue(null, ...) thuong (dua vao TenantContext) vi se suy bien thanh 1
+    // khoa cache/1 truy van DUNG CHUNG cho MOI tenant (phat hien khi rieng soat bao mat: 1 tenant
+    // tuy chinh gioi han dang nhap se anh huong toi tenant khac, hoac lam dang nhap loi toan he
+    // thong neu co 2 tenant tro len cung tuy chinh). Tu tra tenantId truoc (khong nem loi neu
+    // username sai/khong ton tai - viec do de authenticationManager.authenticate() ben duoi xu ly
+    // dung usual, o day chi can 1 gia tri hop ly de ap dung gioi han).
+    Long tenantId = resolveTenantIdQuietly(username);
     int maxAttempts =
-        Integer.parseInt(
-            settingsService.getValue(null, SettingsService.KEY_LOGIN_RATE_LIMIT_ATTEMPTS, "5"));
-    String rateLimitKey = "login:" + clientIp;
-    boolean allowed = rateLimitService.tryConsume(rateLimitKey, maxAttempts, LOGIN_RATE_LIMIT_WINDOW);
-    if (!allowed) {
+        tenantId == null
+            ? 5
+            : Integer.parseInt(
+                settingsService.getValueForTenant(
+                    tenantId, SettingsService.KEY_LOGIN_RATE_LIMIT_ATTEMPTS, "5"));
+    // 2 bucket doc lap: theo IP (chan brute-force xoay IP nham 1 tai khoan) VA theo username (chan
+    // brute-force tu 1 IP dung chung/NAT nham nhieu tai khoan khac nhau) - truoc day chi co bucket
+    // IP, ke tan cong xoay IP (proxy/botnet) co the do mat khau 1 tai khoan cu the khong gioi han
+    // (phat hien khi rieng soat).
+    String ipRateLimitKey = "login:" + clientIp;
+    String userRateLimitKey = "login:user:" + username.trim().toLowerCase();
+    boolean ipAllowed =
+        rateLimitService.tryConsume(ipRateLimitKey, maxAttempts, LOGIN_RATE_LIMIT_WINDOW);
+    boolean userAllowed =
+        rateLimitService.tryConsume(userRateLimitKey, maxAttempts, LOGIN_RATE_LIMIT_WINDOW);
+    if (!ipAllowed || !userAllowed) {
+      // Su kien nhay cam (Prompt #8, P2 quan sat): dang nhap sai VUOT NGUONG (khac 1 lan sai
+      // don le) - dau hieu brute-force, can theo doi rieng khoi AUTH_INVALID_CREDENTIALS thuong.
+      log.warn(
+          "LOGIN_RATE_LIMIT_EXCEEDED username={} clientIp={} tenantId={}",
+          username,
+          clientIp,
+          tenantId);
+      businessMetrics.recordLoginFailed(tenantId, "rate_limited");
       throw AuthException.rateLimitExceeded();
     }
 
@@ -86,15 +120,20 @@ public class AuthService {
           authenticationManager.authenticate(
               new UsernamePasswordAuthenticationToken(username, password));
     } catch (AuthenticationException ex) {
+      log.warn("LOGIN_FAILED username={} clientIp={} tenantId={}", username, clientIp, tenantId);
+      businessMetrics.recordLoginFailed(tenantId, "bad_credentials");
       throw AuthException.invalidCredentials();
     }
 
     // Dang nhap dung — hoan lai luot vua tru: gioi han nay chi de chan do mat khau (dang nhap
     // SAI nhieu lan), khong nham chan nguoi dung dang nhap dung nhieu lan (nhieu tab, doi ca).
-    rateLimitService.refund(rateLimitKey, maxAttempts, LOGIN_RATE_LIMIT_WINDOW);
+    rateLimitService.refund(ipRateLimitKey, maxAttempts, LOGIN_RATE_LIMIT_WINDOW);
+    rateLimitService.refund(userRateLimitKey, maxAttempts, LOGIN_RATE_LIMIT_WINDOW);
 
     List<String> authorities = extractAuthorityCodes(authentication.getAuthorities());
-    Long tenantId = requireTenantId(username);
+    // Ghi de bang gia tri da kiem tra day du (bao gom ca tenant.isActive()) - tenantId o tren chi
+    // dung tam de doc dung cau hinh gioi han dang nhap, khong thay the cho requireTenantId().
+    tenantId = requireTenantId(username);
     String tokenFamily = UUID.randomUUID().toString();
     return issueTokenPair(username, authorities, tenantId, tokenFamily);
   }
@@ -155,7 +194,7 @@ public class AuthService {
             .findByUsernameAndActiveTrue(username)
             .orElseThrow(AuthException::invalidCredentials);
     if (!passwordEncoder.matches(oldPassword, user.getPasswordHash())) {
-      throw new BusinessRuleException("AUTH_INVALID_OLD_PASSWORD", "Mat khau cu khong dung");
+      throw new BusinessRuleException("AUTH_INVALID_OLD_PASSWORD", "Mật khẩu cũ không đúng");
     }
     user.setPasswordHash(passwordEncoder.encode(newPassword));
     userRepository.save(user);
@@ -178,11 +217,24 @@ public class AuthService {
    */
   private Long requireTenantId(String username) {
     User user =
-        userRepository.findByUsernameAndActiveTrue(username).orElseThrow(AuthException::invalidCredentials);
+        userRepository
+            .findByUsernameAndActiveTrue(username)
+            .orElseThrow(AuthException::invalidCredentials);
     if (!user.getTenant().isActive()) {
       throw AuthException.tenantDisabled();
     }
     return user.getTenant().getId();
+  }
+
+  /**
+   * Nhu requireTenantId() nhung KHONG nem loi neu khong tim thay/khong hop le - dung o buoc doc
+   * gioi han dang nhap TRUOC khi xac thuc mat khau, luc chua the/chua nen bao "sai tai khoan".
+   */
+  private Long resolveTenantIdQuietly(String username) {
+    return userRepository
+        .findByUsernameAndActiveTrue(username)
+        .map(user -> user.getTenant().getId())
+        .orElse(null);
   }
 
   private List<String> extractAuthorityCodes(

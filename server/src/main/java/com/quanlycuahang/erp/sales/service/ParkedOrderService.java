@@ -44,7 +44,7 @@ public class ParkedOrderService {
     Branch branch =
         branchRepository
             .findById(request.getBranchId())
-            .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay chi nhanh"));
+            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chi nhánh"));
     ParkedOrder parkedOrder = new ParkedOrder();
     parkedOrder.setBranch(branch);
     parkedOrder.setCartSnapshot(request.getCartSnapshot());
@@ -67,7 +67,7 @@ public class ParkedOrderService {
     ParkedOrder parkedOrder =
         parkedOrderRepository
             .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay don treo"));
+            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn treo"));
     branchAccessGuard.assertAccess(parkedOrder.getBranch().getId());
     ParkedOrderResponse response = parkedOrderMapper.toResponse(parkedOrder);
     parkedOrderRepository.delete(parkedOrder);

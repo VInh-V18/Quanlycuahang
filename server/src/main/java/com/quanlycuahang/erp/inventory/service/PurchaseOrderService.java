@@ -2,6 +2,7 @@ package com.quanlycuahang.erp.inventory.service;
 
 import com.quanlycuahang.erp.auth.security.BranchAccessGuard;
 import com.quanlycuahang.erp.auth.security.CurrentUserProvider;
+import com.quanlycuahang.erp.auth.security.TenantContext;
 import com.quanlycuahang.erp.common.dto.ApiResponse;
 import com.quanlycuahang.erp.common.exception.BusinessRuleException;
 import com.quanlycuahang.erp.common.exception.ResourceNotFoundException;
@@ -31,6 +32,8 @@ import com.quanlycuahang.erp.system.repository.BranchRepository;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -42,6 +45,8 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class PurchaseOrderService {
+
+  private static final Logger log = LoggerFactory.getLogger(PurchaseOrderService.class);
 
   private final PurchaseOrderRepository purchaseOrderRepository;
   private final PurchaseOrderItemRepository purchaseOrderItemRepository;
@@ -89,11 +94,11 @@ public class PurchaseOrderService {
     Supplier supplier =
         supplierRepository
             .findById(request.getSupplierId())
-            .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay nha cung cap"));
+            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhà cung cấp"));
     Branch branch =
         branchRepository
             .findById(request.getBranchId())
-            .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay chi nhanh"));
+            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chi nhánh"));
 
     PurchaseOrder purchaseOrder = new PurchaseOrder();
     purchaseOrder.setSupplier(supplier);
@@ -110,19 +115,24 @@ public class PurchaseOrderService {
       Product product =
           productRepository
               .findById(itemRequest.getProductId())
-              .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay san pham"));
+              .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm"));
 
+      // San pham lan dau nhap tai chi nhanh: khoi tao dong ton = 0 bang ON CONFLICT DO NOTHING roi
+      // khoa lai - khong new Inventory() trong bo nho nhu truoc, vi 2 phieu nhap dong thoi cung
+      // "chua thay" se cung INSERT va va constraint (xem InventoryRepository.initializeIfAbsent).
       Inventory inventory =
           inventoryRepository
               .findByProductIdAndBranchIdForUpdate(product.getId(), branch.getId())
               .orElseGet(
                   () -> {
-                    Inventory created = new Inventory();
-                    created.setProduct(product);
-                    created.setBranch(branch);
-                    created.setStock(BigDecimal.ZERO);
-                    created.setCostPrice(BigDecimal.ZERO);
-                    return created;
+                    inventoryRepository.initializeIfAbsent(
+                        TenantContext.get(), product.getId(), branch.getId());
+                    return inventoryRepository
+                        .findByProductIdAndBranchIdForUpdate(product.getId(), branch.getId())
+                        .orElseThrow(
+                            () ->
+                                new ResourceNotFoundException(
+                                    "Không khởi tạo được tồn kho cho sản phẩm này"));
                   });
 
       BigDecimal newCost =
@@ -206,7 +216,7 @@ public class PurchaseOrderService {
     PurchaseOrder purchaseOrder =
         purchaseOrderRepository
             .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay phieu nhap"));
+            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu nhập"));
     branchAccessGuard.assertAccess(purchaseOrder.getBranch().getId());
     PurchaseOrderResponse response = purchaseOrderMapper.toResponse(purchaseOrder);
     response.setItems(
@@ -217,10 +227,10 @@ public class PurchaseOrderService {
   }
 
   /**
-   * Sua gia nhap 1 dong phieu nhap CU (VD: nhap sai gia luc tao phieu) — gia von duoc tinh lai
-   * bang cach phat lai (replay) toan bo lich su giao dich kho cua san pham/chi nhanh do
-   * (AverageCostService.replay()), khong chi don gian ghi de vi gia von la binh quan gia quyen
-   * phu thuoc thu tu thoi gian. Chi purchase-order:update (Chu/Quan ly) duoc goi (B4 mo rong).
+   * Sua gia nhap 1 dong phieu nhap CU (VD: nhap sai gia luc tao phieu) — gia von duoc tinh lai bang
+   * cach phat lai (replay) toan bo lich su giao dich kho cua san pham/chi nhanh do
+   * (AverageCostService.replay()), khong chi don gian ghi de vi gia von la binh quan gia quyen phu
+   * thuoc thu tu thoi gian. Chi purchase-order:update (Chu/Quan ly) duoc goi (B4 mo rong).
    */
   @Transactional
   public PurchaseOrderResponse updateItemPrice(
@@ -228,12 +238,25 @@ public class PurchaseOrderService {
     PurchaseOrderItem item =
         purchaseOrderItemRepository
             .findById(itemId)
-            .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay dong phieu nhap"));
+            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy dòng phiếu nhập"));
     PurchaseOrder purchaseOrder = item.getPurchaseOrder();
     branchAccessGuard.assertAccess(purchaseOrder.getBranch().getId());
 
     Long productId = item.getProduct().getId();
     Long branchId = purchaseOrder.getBranch().getId();
+
+    // Su kien nhay cam (Prompt #8, P2 quan sat) - sua gia nhap CU anh huong gia von binh quan gia
+    // quyen (replay lai toan bo lich su), can theo doi de phat hien lam dung/sai sot lap lai.
+    log.warn(
+        "PURCHASE_ORDER_ITEM_PRICE_EDITED purchaseOrderItemId={} productId={} branchId={}"
+            + " oldPrice={} newPrice={} reason={} tenantId={}",
+        itemId,
+        productId,
+        branchId,
+        item.getUnitPrice(),
+        request.getUnitPrice(),
+        request.getReason(),
+        TenantContext.get());
 
     // Khoa dong Inventory truoc (giong create()) de serialize voi cac phieu nhap/ban/kiem ke khac
     // dang chay song song tren cung san pham — tranh doc lich su nua chung khi tinh lai gia von.
@@ -241,7 +264,7 @@ public class PurchaseOrderService {
         inventoryRepository
             .findByProductIdAndBranchIdForUpdate(productId, branchId)
             .orElseThrow(
-                () -> new ResourceNotFoundException("San pham chua co ton kho o chi nhanh nay"));
+                () -> new ResourceNotFoundException("Sản phẩm chưa có tồn kho ở chi nhánh này"));
 
     InventoryTransaction targetTransaction =
         inventoryTransactionRepository
@@ -250,7 +273,7 @@ public class PurchaseOrderService {
                 () ->
                     new BusinessRuleException(
                         "PURCHASE_ORDER_ITEM_NOT_LINKED",
-                        "Phieu nhap nay la du lieu cu, chua ho tro sua gia"));
+                        "Phiếu nhập này là dữ liệu cũ, chưa hỗ trợ sửa giá"));
 
     List<InventoryTransaction> history =
         inventoryTransactionRepository.findAllForCostReplay(productId, branchId);
@@ -260,22 +283,23 @@ public class PurchaseOrderService {
     if (replay.stock().compareTo(inventory.getStock()) != 0) {
       throw new BusinessRuleException(
           "STOCK_REPLAY_MISMATCH",
-          "Khong the xac minh ton kho khi tinh lai gia von, vui long kiem tra thu cong truoc khi sua");
+          "Không thể xác minh tồn kho khi tính lại giá vốn, vui lòng kiểm tra thủ công trước khi sửa");
     }
 
     BigDecimal delta =
         request.getUnitPrice().subtract(item.getUnitPrice()).multiply(item.getQuantity());
 
     List<Debt> debts =
-        debtRepository.findByReferenceTypeAndReferenceId("purchase_order", purchaseOrder.getId());
+        debtRepository.findByReferenceTypeAndReferenceIdOrderByIdAsc(
+            "purchase_order", purchaseOrder.getId());
     Debt debt = debts.isEmpty() ? null : debts.get(0);
     if (debt != null) {
       BigDecimal newAmount = debt.getAmount().add(delta);
       if (newAmount.compareTo(BigDecimal.ZERO) < 0) {
         throw new BusinessRuleException(
             "DEBT_ADJUSTMENT_NEGATIVE",
-            "So tien sua giam vuot qua cong no con lai cua phieu nay — vui long dieu chinh cong no"
-                + " thu cong truoc khi sua gia");
+            "Số tiền sửa giảm vượt quá công nợ còn lại của phiếu này — vui lòng điều chỉnh công nợ"
+                + " thủ công trước khi sửa giá");
       }
       debt.setAmount(newAmount);
       debt.setOriginalAmount(debt.getOriginalAmount().add(delta));

@@ -24,12 +24,5 @@ export async function listPermissions(): Promise<Permission[]> {
   return response.data.data;
 }
 
-export async function updateRolePermissions(
-  roleId: number,
-  permissionCodes: string[],
-): Promise<Role> {
-  const response = await apiClient.put<ApiSuccess<Role>>(`/roles/${roleId}/permissions`, {
-    permissionCodes,
-  });
-  return response.data.data;
-}
+// updateRolePermissions da bi go bo: endpoint tenant PUT /roles/{id}/permissions khong con ton tai
+// (Role la du lieu toan cuc, viec sua da chuyen han sang Super Admin o /platform-admin/roles).

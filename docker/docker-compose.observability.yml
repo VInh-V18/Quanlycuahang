@@ -1,0 +1,39 @@
+# Overlay TUY CHON (Prompt #8, P2 quan sat, muc 6) - Prometheus + Grafana, khong bat mac dinh vi
+# khong phai moi lan trien khai deu can (VD: 1 cua hang nho dung docker-compose.yml don gian).
+# Bat khi can qua dashboard truc quan:
+#   docker compose --env-file .env -f docker/docker-compose.yml -f docker/docker-compose.observability.yml up -d
+#
+# Ca 2 container CHI noi bo trong mang docker-compose (khong publish port ra host/Internet, giong
+# nguyen tac da ap dung cho /actuator/** cua chinh server o docker-compose.yml/nginx.conf) - muon
+# xem Grafana tu may host, SSH tunnel port 3000 ve may cua ban thay vi mo port ra ngoai:
+#   ssh -L 3000:localhost:3000 user@vps-host
+#   (roi truy cap http://localhost:3000 tren may minh, KHONG can sua file nay)
+#
+# Neu khong bat overlay nay, van co the theo doi qua bat ky Prometheus/Grafana da co san nao khac
+# trong ha tang cua ban - chi can tro scrape config toi <server-host>:8080/actuator/prometheus.
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      - server
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  prometheus-data:
+  grafana-data:

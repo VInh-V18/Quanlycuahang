@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { Download, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,8 +32,11 @@ import {
 } from "@/lib/api/inventory";
 import { getInventoryValue } from "@/lib/api/reports";
 import { useCurrentBranchId } from "@/lib/hooks/useCurrentBranchId";
+import { formatDateTime } from "@/lib/utils";
 
 const numberFormatter = new Intl.NumberFormat("vi-VN");
+
+const EXPIRY_THRESHOLDS: Record<string, number> = { "3": 3, "7": 7, "30": 30 };
 
 const REFERENCE_PREFIX: Record<string, string> = {
   order: "HD",
@@ -69,11 +72,32 @@ export function InventoryPage() {
   const [onlyLowStock, setOnlyLowStock] = useState(false);
   const [expiryFilter, setExpiryFilter] = useState("all");
   const [selectedProduct, setSelectedProduct] = useState<InventoryItem | null>(null);
+  const [page, setPage] = useState(0);
+
+  // Truoc day goi listInventory(branchId) KHONG truyen page - luon co dinh page=0/size=50 (mac dinh
+  // trong lib/api/inventory.ts), nen cua hang co qua 50 SKU se co san pham nam ngoai trang dau bi
+  // AN HOAN TOAN, khong co cach nao xem duoc (khong co UI phan trang) - phat hien khi rieng soat.
+  // Reset ve trang 0 moi khi bat ky dieu kien loc nao doi - search/expiryFilter truoc day chi loc
+  // TREN DU LIEU CUA 1 TRANG DA FETCH (useMemo phia duoi), nen san pham chi nam o trang khac bao
+  // "khong tim thay" du thuc su ton tai; nay gui thang len server nen phai reset trang giong het
+  // onlyLowStock (phat hien khi rieng soat).
+  useEffect(() => setPage(0), [onlyLowStock, search, expiryFilter]);
+
+  const expiryThresholdDays: number | undefined =
+    expiryFilter === "all" ? undefined : EXPIRY_THRESHOLDS[expiryFilter];
 
   const inventoryQuery = useQuery({
-    queryKey: ["inventory", branchId, onlyLowStock],
-    queryFn: () => (onlyLowStock ? listLowStock(branchId) : listInventory(branchId)),
+    queryKey: ["inventory", branchId, onlyLowStock, page, search, expiryThresholdDays],
+    queryFn: () => {
+      const params = { search: search.trim() || undefined, expiryThresholdDays };
+      return onlyLowStock
+        ? listLowStock(branchId, page, 50, params)
+        : listInventory(branchId, page, 50, params);
+    },
   });
+
+  const meta = inventoryQuery.data?.meta;
+  const totalPages = meta ? Math.max(1, Math.ceil(meta.total / Math.max(meta.limit, 1))) : 1;
 
   const valueQuery = useQuery({
     queryKey: ["reports", "inventory-value", branchId],
@@ -86,22 +110,7 @@ export function InventoryPage() {
     enabled: !!selectedProduct,
   });
 
-  const expiryThresholds: Record<string, number> = { "3": 3, "7": 7, "30": 30 };
-
-  const rows = useMemo(() => {
-    let list = inventoryQuery.data?.data ?? [];
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      list = list.filter(
-        (r) => r.productName.toLowerCase().includes(q) || r.sku.toLowerCase().includes(q),
-      );
-    }
-    if (expiryFilter !== "all") {
-      const threshold = expiryThresholds[expiryFilter];
-      list = list.filter((r) => r.nearestExpiryDate && daysUntil(r.nearestExpiryDate) <= threshold);
-    }
-    return list;
-  }, [inventoryQuery.data, search, expiryFilter]);
+  const rows = inventoryQuery.data?.data ?? [];
 
   const totalValue = valueQuery.data?.[0]?.totalValue ?? 0;
 
@@ -229,6 +238,33 @@ export function InventoryPage() {
                 )}
               </TableBody>
             </Table>
+            {meta && (
+              <div className="flex items-center justify-between border-t p-3 text-sm text-muted-foreground">
+                <span>
+                  Trang {page + 1}/{totalPages} — tổng {meta.total} sản phẩm
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page <= 0}
+                    onClick={() => setPage((p) => p - 1)}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Trước
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page + 1 >= totalPages}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    Sau
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -251,7 +287,7 @@ export function InventoryPage() {
                   <div key={tx.id} className="flex items-center justify-between text-sm">
                     <div>
                       <div className="text-muted-foreground">
-                        {new Date(tx.createdAt).toLocaleString("vi-VN")}
+                        {formatDateTime(tx.createdAt)}
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="rounded bg-accent px-1.5 py-0.5 text-xs font-medium">

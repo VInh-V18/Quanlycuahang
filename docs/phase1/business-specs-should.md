@@ -5,8 +5,16 @@ Quy tắc → Hậu điều kiện.
 
 ## UC-11 — Khuyến mãi / Voucher
 
-**Mô tả**: Tạo chương trình khuyến mãi (CK % hoặc số tiền, áp dụng theo sản
-phẩm/danh mục/toàn đơn) và voucher (mã dùng 1 lần hoặc nhiều lần, có hạn
+> **Cập nhật (Prompt #10, P3 — dọn dẹp nợ kỹ thuật, 2026-07-12)**: chỉ phần
+> **Voucher** được xây dựng thật. Phần "chương trình khuyến mãi tự động"
+> (bảng `promotions`) chưa từng có Entity/Service/Controller nào — bảng DB mồ
+> côi đã bị **xoá hẳn** (migration `V29__drop_orphaned_promotions_table.sql`)
+> sau khi xác nhận với chủ hệ thống. Nếu sau này cần giảm giá tự động theo
+> khung giờ/số lượng/nhóm khách hàng (không cần khách nhập mã), đây là tính
+> năng MỚI cần thiết kế lại từ đầu (Entity, tích hợp vào
+> `OrderPricingService`, trang quản trị FE) — không phải khôi phục bảng cũ.
+
+**Mô tả**: Tạo voucher (mã dùng 1 lần hoặc nhiều lần, có hạn
 dùng, đơn tối thiểu, giới hạn lượt).
 
 **Tiền điều kiện**: Có quyền `promotion:manage`.
@@ -57,7 +65,17 @@ vượt giới hạn cấu hình.
 
 ---
 
-## UC-13 — Hủy đơn hàng
+## UC-13 — Hủy đơn hàng (ĐÃ XOÁ — Prompt #10, P3)
+
+> **Cập nhật (Prompt #10, P3 — dọn dẹp nợ kỹ thuật, 2026-07-12)**: use case
+> này TỪNG được cài đặt đầy đủ ở Backend (`OrderService.cancelOrder()` +
+> `POST /api/v1/orders/{id}/cancel`) nhưng KHÔNG có nút/màn hình nào ở FE gọi
+> tới kể từ khi triển khai — rà soát dead code phát hiện và đã xoá cả
+> endpoint lẫn logic sau khi xác nhận với chủ hệ thống (không phải xoá do lỗi,
+> mà do xác nhận tính năng không cần dùng). Mô tả nghiệp vụ dưới đây được GIỮ
+> LẠI nguyên văn để tham khảo nếu sau này muốn làm lại tính năng này (kèm nút
+> "Hủy đơn" ở FE) — code thật đã không còn trong nhánh `main` hiện tại, cần
+> xem lại lịch sử git nếu cần khôi phục.
 
 **Mô tả**: Hủy đơn `completed` trong ngày, cần quyền Quản lý trở lên.
 

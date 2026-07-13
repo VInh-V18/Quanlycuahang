@@ -23,8 +23,10 @@ import org.springframework.stereotype.Component;
 @Component
 public class BranchAccessGuard {
 
-  /** owner/manager quan ly toan chuoi (trong PHAM VI tenant cua ho), khong bi gioi han theo
-   * user_branches. */
+  /**
+   * owner/manager quan ly toan chuoi (trong PHAM VI tenant cua ho), khong bi gioi han theo
+   * user_branches.
+   */
   private static final Set<String> FULL_ACCESS_ROLE_CODES = Set.of("owner", "manager");
 
   private final CurrentUserProvider currentUserProvider;
@@ -48,20 +50,20 @@ public class BranchAccessGuard {
       if (hasFullAccess(user)) {
         return;
       }
-      throw new PermissionDeniedException("Vui long chon 1 chi nhanh cu the");
+      throw new PermissionDeniedException("Vui lòng chọn 1 chi nhánh cụ thể");
     }
     // Branch.@Filter tu dong loai tru chi nhanh khac tenant — existsById tra false ca khi branchId
     // co that (thuoc tenant khac) lan khi khong ton tai, dung y: khong duoc phep tiet lo chi nhanh
     // do co ton tai hay khong o he thong khac.
     if (!branchRepository.existsById(branchId)) {
-      throw new PermissionDeniedException("Khong tim thay chi nhanh nay");
+      throw new PermissionDeniedException("Không tìm thấy chi nhánh này");
     }
     if (hasFullAccess(user)) {
       return;
     }
     boolean allowed = user.getBranches().stream().anyMatch(b -> b.getId().equals(branchId));
     if (!allowed) {
-      throw new PermissionDeniedException("Ban khong co quyen truy cap chi nhanh nay");
+      throw new PermissionDeniedException("Bạn không có quyền truy cập chi nhánh này");
     }
   }
 

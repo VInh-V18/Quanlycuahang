@@ -1,8 +1,10 @@
 package com.quanlycuahang.erp.sales.service;
 
+import static com.quanlycuahang.erp.common.util.Instants.toInstant;
+
 import com.quanlycuahang.erp.auth.security.BranchAccessGuard;
-import com.quanlycuahang.erp.auth.security.TenantContext;
 import com.quanlycuahang.erp.auth.security.CurrentUserProvider;
+import com.quanlycuahang.erp.auth.security.TenantContext;
 import com.quanlycuahang.erp.common.dto.ApiResponse;
 import com.quanlycuahang.erp.common.exception.BusinessRuleException;
 import com.quanlycuahang.erp.common.exception.ResourceNotFoundException;
@@ -26,7 +28,6 @@ import com.quanlycuahang.erp.sales.repository.ReturnRepository;
 import com.quanlycuahang.erp.sales.statemachine.OrderStatus;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -83,13 +84,13 @@ public class ReturnService {
     Order order =
         orderRepository
             .findById(request.getOrderId())
-            .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay don hang"));
+            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng"));
     branchAccessGuard.assertAccess(order.getBranch().getId());
 
     OrderStatus currentStatus = OrderStatus.fromValue(order.getStatus());
     if (currentStatus != OrderStatus.COMPLETED && currentStatus != OrderStatus.PARTIALLY_RETURNED) {
       throw new BusinessRuleException(
-          "ORDER_NOT_RETURNABLE", "Don hang khong o trang thai co the tra hang");
+          "ORDER_NOT_RETURNABLE", "Đơn hàng không ở trạng thái có thể trả hàng");
     }
 
     com.quanlycuahang.erp.sales.entity.Return returnEntity =
@@ -102,21 +103,24 @@ public class ReturnService {
 
     BigDecimal totalRefund = BigDecimal.ZERO;
     List<ReturnItemResponse> itemResponses = new ArrayList<>();
+    List<OrderItem> updatedOrderItems = new ArrayList<>();
+    List<InventoryTransaction> transactions = new ArrayList<>();
+    List<com.quanlycuahang.erp.sales.entity.ReturnItem> returnItems = new ArrayList<>();
 
     for (ReturnItemRequest itemRequest : request.getItems()) {
       OrderItem orderItem =
           orderItemRepository
-              .findById(itemRequest.getOrderItemId())
-              .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay dong don hang"));
+              .findByIdForUpdate(itemRequest.getOrderItemId())
+              .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy dòng đơn hàng"));
       if (!orderItem.getOrder().getId().equals(order.getId())) {
-        throw new ResourceNotFoundException("Dong hang khong thuoc don nay");
+        throw new ResourceNotFoundException("Dòng hàng không thuộc đơn này");
       }
 
       BigDecimal remaining = orderItem.getQuantity().subtract(orderItem.getReturnedQuantity());
       if (itemRequest.getQuantity().compareTo(remaining) > 0) {
         throw new BusinessRuleException(
             "RETURN_QUANTITY_EXCEEDED",
-            "So luong tra vuot qua so luong con lai cua " + orderItem.getProductNameSnapshot());
+            "Số lượng trả vượt quá số lượng còn lại của " + orderItem.getProductNameSnapshot());
       }
 
       BigDecimal unitEffectivePrice =
@@ -125,12 +129,12 @@ public class ReturnService {
           unitEffectivePrice.multiply(itemRequest.getQuantity()).setScale(0, RoundingMode.HALF_UP);
 
       orderItem.setReturnedQuantity(orderItem.getReturnedQuantity().add(itemRequest.getQuantity()));
-      orderItemRepository.save(orderItem);
+      updatedOrderItems.add(orderItem);
 
       Inventory inventory =
           inventoryRepository
               .findByProductIdAndBranchId(orderItem.getProduct().getId(), order.getBranch().getId())
-              .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay ton kho"));
+              .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tồn kho"));
       inventory.setStock(inventory.getStock().add(itemRequest.getQuantity()));
       inventoryRepository.saveAndFlush(inventory);
 
@@ -143,7 +147,7 @@ public class ReturnService {
       transaction.setReferenceType("return");
       transaction.setReferenceId(returnEntity.getId());
       currentUserProvider.getCurrentUser().ifPresent(transaction::setCreatedBy);
-      inventoryTransactionRepository.save(transaction);
+      transactions.add(transaction);
 
       com.quanlycuahang.erp.sales.entity.ReturnItem returnItem =
           new com.quanlycuahang.erp.sales.entity.ReturnItem();
@@ -151,7 +155,7 @@ public class ReturnService {
       returnItem.setOrderItem(orderItem);
       returnItem.setQuantity(itemRequest.getQuantity());
       returnItem.setRefundAmount(refundAmount);
-      returnItemRepository.save(returnItem);
+      returnItems.add(returnItem);
 
       totalRefund = totalRefund.add(refundAmount);
 
@@ -162,6 +166,10 @@ public class ReturnService {
       itemResponse.setRefundAmount(refundAmount);
       itemResponses.add(itemResponse);
     }
+
+    orderItemRepository.saveAll(updatedOrderItems);
+    inventoryTransactionRepository.saveAll(transactions);
+    returnItemRepository.saveAll(returnItems);
 
     returnEntity.setTotalRefund(totalRefund);
     returnRepository.save(returnEntity);
@@ -179,7 +187,7 @@ public class ReturnService {
     // Neu don goc ban no (co Debt receivable gan voi don), giam cong no truoc; phan con lai
     // (neu co) coi nhu hoan tien mat/CK thuc te ngoai he thong theo request.refundMethod.
     List<Debt> relatedDebts =
-        debtRepository.findByReferenceTypeAndReferenceId("order", order.getId());
+        debtRepository.findByReferenceTypeAndReferenceIdOrderByIdAsc("order", order.getId());
     BigDecimal remainingRefund = totalRefund;
     for (Debt debt : relatedDebts) {
       if (remainingRefund.compareTo(BigDecimal.ZERO) <= 0) {
@@ -200,8 +208,10 @@ public class ReturnService {
     return response;
   }
 
-  /** Lich su cac phieu tra hang da tao (FH-9 — cung tieu chi loc voi Hoa don/Don hang), dung cho
-   * trang Tra hang thay vi bat chon lai tu danh sach don ban (da co san o Don hang). */
+  /**
+   * Lich su cac phieu tra hang da tao (FH-9 — cung tieu chi loc voi Hoa don/Don hang), dung cho
+   * trang Tra hang thay vi bat chon lai tu danh sach don ban (da co san o Don hang).
+   */
   @Transactional(readOnly = true)
   public ApiResponse<List<ReturnListItemResponse>> list(
       Long branchId, LocalDate from, LocalDate to, String search, Pageable pageable) {
@@ -233,21 +243,5 @@ public class ReturnService {
     response.setItemCount(((Number) row[7]).longValue());
     response.setCreatedByName((String) row[8]);
     return response;
-  }
-
-  private static Instant toInstant(Object value) {
-    if (value == null) {
-      return null;
-    }
-    if (value instanceof Instant instant) {
-      return instant;
-    }
-    if (value instanceof OffsetDateTime odt) {
-      return odt.toInstant();
-    }
-    if (value instanceof java.sql.Timestamp ts) {
-      return ts.toInstant();
-    }
-    throw new IllegalStateException("Khong the chuyen doi thoi gian: " + value.getClass());
   }
 }

@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import { Download } from "lucide-react";
+import { AiExplainButton } from "@/components/ai/AiExplainButton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable, type DataTableColumn } from "@/components/common/DataTable";
@@ -239,6 +240,15 @@ export function ReportsPage() {
                   <Download className="mr-2 h-4 w-4" />
                   Xuất Excel
                 </Button>
+                <AiExplainButton
+                  dataContext={{
+                    tuNgay: params.from,
+                    denNgay: params.to,
+                    nhomTheo: revenueGroupBy,
+                    doanhThuTheoKy: revenueQuery.data,
+                    loiNhuanGop: grossProfitQuery.data,
+                  }}
+                />
               </div>
             </CardHeader>
             <CardContent>
@@ -322,13 +332,23 @@ export function ReportsPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle>Top sản phẩm</CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => downloadReportExcel("top-products", { ...params, limit: 10 }, "top-san-pham.xlsx")}
-              >
-                <Download className="h-4 w-4" />
-              </Button>
+              <div className="flex gap-2">
+                <AiExplainButton
+                  dataContext={{
+                    tuNgay: params.from,
+                    denNgay: params.to,
+                    topSanPham: (topProductsQuery.data ?? []).slice(0, 5),
+                    topKhachHang: (topCustomersQuery.data ?? []).slice(0, 5),
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => downloadReportExcel("top-products", { ...params, limit: 10 }, "top-san-pham.xlsx")}
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <DataTable
@@ -391,6 +411,9 @@ export function ReportsPage() {
                     <TabsTrigger value="branch">Theo chi nhánh</TabsTrigger>
                   </TabsList>
                 </Tabs>
+                <AiExplainButton
+                  dataContext={{ nhomTheo: inventoryGroupBy, giaTriTonKho: inventoryQuery.data }}
+                />
                 <Button
                   variant="outline"
                   size="sm"
@@ -415,12 +438,15 @@ export function ReportsPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle>Công nợ theo tuổi nợ</CardTitle>
-              <Tabs value={debtDirection} onValueChange={(v) => setDebtDirection(v as "receivable" | "payable")}>
-                <TabsList>
-                  <TabsTrigger value="receivable">Khách hàng nợ</TabsTrigger>
-                  <TabsTrigger value="payable">Phải trả NCC</TabsTrigger>
-                </TabsList>
-              </Tabs>
+              <div className="flex items-center gap-2">
+                <Tabs value={debtDirection} onValueChange={(v) => setDebtDirection(v as "receivable" | "payable")}>
+                  <TabsList>
+                    <TabsTrigger value="receivable">Khách hàng nợ</TabsTrigger>
+                    <TabsTrigger value="payable">Phải trả NCC</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                <AiExplainButton dataContext={{ huongNo: debtDirection, congNo: debtQuery.data }} />
+              </div>
             </CardHeader>
             <CardContent>
               <DataTable

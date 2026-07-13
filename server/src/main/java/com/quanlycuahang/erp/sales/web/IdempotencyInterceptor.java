@@ -45,7 +45,20 @@ public class IdempotencyInterceptor implements HandlerInterceptor {
     }
     String key = request.getHeader(HEADER);
     if (key == null || key.isBlank()) {
-      return true;
+      // Header nay TRUOC day la tuy chon (return true = bo qua chong trung) - phat hien khi rieng
+      // soat: FE co the goi khong kem header (hoac sinh key MOI moi lan bam lai), khien co che
+      // chong
+      // trung nay hoan toan vo hieu dung luc can nhat (checkout POS). Bat buoc header o day thay vi
+      // chi dua vao FE gui dung, vi day la lop an toan phia server, khong the tin FE tuyet doi.
+      writeJson(
+          response,
+          HttpServletResponse.SC_BAD_REQUEST,
+          ApiResponse.error(
+              new ApiError(
+                  "IDEMPOTENCY_KEY_REQUIRED",
+                  "Thieu header Idempotency-Key bat buoc cho tao don hang",
+                  Map.of())));
+      return false;
     }
 
     Optional<String> completed = idempotencyService.getCompletedResult(key);

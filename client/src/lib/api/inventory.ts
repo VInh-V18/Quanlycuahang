@@ -25,13 +25,19 @@ export interface InventoryTransaction {
   createdAt: string;
 }
 
+export interface InventoryListParams {
+  search?: string;
+  expiryThresholdDays?: number;
+}
+
 export async function listInventory(
   branchId: number,
   page = 0,
   size = 50,
+  params: InventoryListParams = {},
 ): Promise<ApiSuccess<InventoryItem[]>> {
   const response = await apiClient.get<ApiSuccess<InventoryItem[]>>("/inventory", {
-    params: { branchId, page, size },
+    params: { branchId, page, size, ...params },
   });
   return response.data;
 }
@@ -40,9 +46,10 @@ export async function listLowStock(
   branchId: number,
   page = 0,
   size = 50,
+  params: InventoryListParams = {},
 ): Promise<ApiSuccess<InventoryItem[]>> {
   const response = await apiClient.get<ApiSuccess<InventoryItem[]>>("/inventory/low-stock", {
-    params: { branchId, page, size },
+    params: { branchId, page, size, ...params },
   });
   return response.data;
 }

@@ -9,6 +9,7 @@ import { DateRangePicker } from "@/components/common/DateRangePicker";
 import { Money } from "@/components/common/Money";
 import { listInvoices, type InvoiceListItem } from "@/lib/api/invoices";
 import { useCurrentBranchId } from "@/lib/hooks/useCurrentBranchId";
+import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import { getApiErrorMessage } from "@/lib/http/errors";
 
 const PAGE_SIZE = 20;
@@ -26,16 +27,18 @@ export function InvoicesPage() {
     return { from: today, to: today };
   });
 
+  const debouncedSearch = useDebouncedValue(search);
+
   const params = useMemo(
     () => ({
       branchId,
       page,
       size: PAGE_SIZE,
-      search,
+      search: debouncedSearch,
       from: toIsoDate(range.from),
       to: toIsoDate(range.to),
     }),
-    [branchId, page, search, range],
+    [branchId, page, debouncedSearch, range],
   );
 
   const { data, isLoading, isError, error } = useQuery({

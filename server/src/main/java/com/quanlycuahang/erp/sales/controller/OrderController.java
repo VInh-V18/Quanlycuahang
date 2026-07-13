@@ -109,10 +109,4 @@ public class OrderController {
   public ResponseEntity<ApiResponse<OrderResponse>> getById(@PathVariable Long id) {
     return ResponseEntity.ok(ApiResponse.success(orderService.getById(id)));
   }
-
-  @PostMapping("/{id}/cancel")
-  @PreAuthorize("hasAuthority('order:void')")
-  public ResponseEntity<ApiResponse<OrderResponse>> cancel(@PathVariable Long id) {
-    return ResponseEntity.ok(ApiResponse.success(orderService.cancelOrder(id)));
-  }
 }

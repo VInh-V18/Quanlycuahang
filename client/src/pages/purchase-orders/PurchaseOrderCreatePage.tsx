@@ -1,9 +1,17 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Search, X } from "lucide-react";
+import { Bot, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -13,11 +21,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Money } from "@/components/common/Money";
+import { PermissionGate } from "@/components/common/PermissionGate";
 import { useToast } from "@/components/ui/use-toast";
+import {
+  getAdvancedPurchaseSuggestions,
+  getPurchaseSuggestions,
+  type PurchaseSuggestion,
+} from "@/lib/api/ai";
 import { createPurchaseOrder } from "@/lib/api/purchaseOrders";
-import { searchProducts, type Product } from "@/lib/api/products";
+import { getProduct, searchProducts, type Product } from "@/lib/api/products";
 import { listSuppliers } from "@/lib/api/suppliers";
 import { useCurrentBranchId } from "@/lib/hooks/useCurrentBranchId";
+import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import { getApiErrorMessage } from "@/lib/http/errors";
 
 interface DraftLine {
@@ -36,6 +51,116 @@ function calculateNewCost(currentStock: number, currentCost: number, qty: number
   return Math.round((currentStock * currentCost + qty * price) / totalStock);
 }
 
+/** Danh sach goi y nhap hang tu thuat toan xac dinh (Prompt #11, tinh nang dot 1b - xem Javadoc
+ * AiPurchaseSuggestionService, KHONG phai LLM) - nguoi dung XEM va TU BAM THEM tung dong, khong co
+ * dong nao duoc tu dong dua vao phieu ma khong qua xac nhan. */
+function AiSuggestionsDialog({
+  branchId,
+  mode,
+  existingProductIds,
+  onAdd,
+  onClose,
+}: {
+  branchId: number;
+  /** "advanced" (Prompt #12) qua ml-service (IsolationForest, hien them % do tin cay) - Backend tu
+   * fallback ve cong thuc don gian neu ml-service khong kha dung, FE khong can tu xu ly rieng. */
+  mode: "simple" | "advanced";
+  existingProductIds: number[];
+  onAdd: (product: Product, quantity: number) => void;
+  onClose: () => void;
+}) {
+  const [addedIds, setAddedIds] = useState<number[]>([]);
+  const { toast } = useToast();
+
+  const suggestionsQuery = useQuery({
+    queryKey: ["ai", "purchase-suggestions", mode, branchId],
+    queryFn: () =>
+      mode === "advanced" ? getAdvancedPurchaseSuggestions(branchId) : getPurchaseSuggestions(branchId),
+  });
+
+  const addMutation = useMutation({
+    mutationFn: async (suggestion: PurchaseSuggestion) => {
+      const product = await getProduct(suggestion.productId, branchId);
+      return { product, quantity: suggestion.suggestedQty };
+    },
+    onSuccess: ({ product, quantity }) => {
+      onAdd(product, quantity);
+      setAddedIds((prev) => [...prev, product.id]);
+    },
+    onError: (err) => {
+      toast({
+        variant: "destructive",
+        title: "Không thể thêm sản phẩm",
+        description: getApiErrorMessage(err),
+      });
+    },
+  });
+
+  const suggestions = suggestionsQuery.data ?? [];
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Bot className="h-5 w-5" />
+            {mode === "advanced" ? "Gợi ý nhập hàng AI nâng cao" : "Gợi ý nhập hàng từ AI"}
+          </DialogTitle>
+          <DialogDescription>
+            {mode === "advanced"
+              ? "Dựa trên mô hình phân tích 90 ngày bán gần đây (đã lọc ngày bán bất thường). Xem lại và bấm \"Thêm\" cho từng sản phẩm bạn muốn đưa vào phiếu."
+              : "Dựa trên tốc độ bán 30 ngày gần đây và định mức tồn tối thiểu. Xem lại và bấm \"Thêm\" cho từng sản phẩm bạn muốn đưa vào phiếu."}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="max-h-[60vh] space-y-2 overflow-y-auto">
+          {suggestionsQuery.isLoading && (
+            <p className="py-6 text-center text-sm text-muted-foreground">Đang lấy gợi ý...</p>
+          )}
+          {suggestionsQuery.isError && (
+            <p className="py-6 text-center text-sm text-destructive">
+              {getApiErrorMessage(suggestionsQuery.error, "Không thể lấy gợi ý nhập hàng")}
+            </p>
+          )}
+          {suggestionsQuery.isSuccess && suggestions.length === 0 && (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Không có sản phẩm nào cần nhập thêm lúc này
+            </p>
+          )}
+          {suggestions.map((s) => {
+            const alreadyInOrder = existingProductIds.includes(s.productId) || addedIds.includes(s.productId);
+            return (
+              <div key={s.productId} className="flex items-center justify-between gap-2 rounded-md border p-2">
+                <div className="min-w-0">
+                  <div className="truncate font-medium">{s.productName}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {s.sku} · Tồn {s.currentStock}/{s.minStock} · Gợi ý nhập {s.suggestedQty}
+                    {s.confidence != null && ` · Độ tin cậy ${Math.round(s.confidence * 100)}%`}
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant={alreadyInOrder ? "outline" : "default"}
+                  disabled={alreadyInOrder || (addMutation.isPending && addMutation.variables?.productId === s.productId)}
+                  onClick={() => addMutation.mutate(s)}
+                >
+                  {alreadyInOrder ? "Đã thêm" : "Thêm"}
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Đóng
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function PurchaseOrderCreatePage() {
   const branchId = useCurrentBranchId();
   const [search, setSearch] = useState("");
@@ -43,14 +168,17 @@ export function PurchaseOrderCreatePage() {
   const [supplierId, setSupplierId] = useState<string>("");
   const [discountAmount, setDiscountAmount] = useState(0);
   const [paidAmount, setPaidAmount] = useState(0);
+  const [aiSuggestionsMode, setAiSuggestionsMode] = useState<"simple" | "advanced" | null>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  const debouncedSearch = useDebouncedValue(search);
+
   const searchQuery = useQuery({
-    queryKey: ["products", "search-to-add", search, branchId],
-    queryFn: () => searchProducts({ search, page: 0, size: 8, branchId }),
-    enabled: search.trim().length > 0,
+    queryKey: ["products", "search-to-add", debouncedSearch, branchId],
+    queryFn: () => searchProducts({ search: debouncedSearch, page: 0, size: 8, branchId }),
+    enabled: debouncedSearch.trim().length > 0,
   });
 
   const suppliersQuery = useQuery({ queryKey: ["suppliers"], queryFn: listSuppliers });
@@ -63,11 +191,11 @@ export function PurchaseOrderCreatePage() {
   const payable = Math.max(0, totalAmount - discountAmount);
   const debtAmount = Math.max(0, payable - paidAmount);
 
-  function addProduct(product: Product) {
+  function addProduct(product: Product, quantity = 1) {
     if (lines.some((l) => l.product.id === product.id)) return;
     setLines((prev) => [
       ...prev,
-      { product, quantity: 1, unitPrice: product.costPrice ?? product.sellPrice, batchCode: "", expiryDate: "" },
+      { product, quantity, unitPrice: product.costPrice ?? product.sellPrice, batchCode: "", expiryDate: "" },
     ]);
     setSearch("");
   }
@@ -115,10 +243,32 @@ export function PurchaseOrderCreatePage() {
           <h1 className="text-2xl font-bold">Tạo phiếu nhập</h1>
           <p className="text-sm text-muted-foreground">Nhập kho / Tạo phiếu</p>
         </div>
-        <Button size="lg" disabled={!canSubmit} onClick={() => createMutation.mutate()}>
-          Hoàn tất nhập kho
-        </Button>
+        <div className="flex items-center gap-2">
+          <PermissionGate perm="ai:use">
+            <Button variant="outline" onClick={() => setAiSuggestionsMode("simple")}>
+              <Bot className="h-4 w-4" />
+              Gợi ý từ AI
+            </Button>
+            <Button variant="outline" onClick={() => setAiSuggestionsMode("advanced")}>
+              <Bot className="h-4 w-4" />
+              Gợi ý AI nâng cao
+            </Button>
+          </PermissionGate>
+          <Button size="lg" disabled={!canSubmit} onClick={() => createMutation.mutate()}>
+            Hoàn tất nhập kho
+          </Button>
+        </div>
       </div>
+
+      {aiSuggestionsMode && (
+        <AiSuggestionsDialog
+          branchId={branchId}
+          mode={aiSuggestionsMode}
+          existingProductIds={lines.map((l) => l.product.id)}
+          onAdd={(product, quantity) => addProduct(product, quantity)}
+          onClose={() => setAiSuggestionsMode(null)}
+        />
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">

@@ -1,11 +1,6 @@
-import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
-import type { ApiFailure, ApiSuccess } from "@/types/api";
-
-declare module "axios" {
-  export interface InternalAxiosRequestConfig {
-    _retry?: boolean;
-  }
-}
+import axios from "axios";
+import type { ApiSuccess } from "@/types/api";
+import { registerAuthRefreshInterceptor } from "@/lib/http/authRefreshInterceptor";
 
 /**
  * Client rieng cho Super Admin - CO CHU DINH tach biet hoan toan khoi apiClient chinh (khong dung
@@ -36,65 +31,12 @@ platformAdminApiClient.interceptors.request.use((config) => {
   return config;
 });
 
-let isRefreshing = false;
-let pendingQueue: Array<(token: string | null) => void> = [];
-
-function resolveQueue(token: string | null) {
-  pendingQueue.forEach((resolve) => resolve(token));
-  pendingQueue = [];
-}
-
-platformAdminApiClient.interceptors.response.use(
-  (response) => response,
-  async (error: AxiosError<ApiFailure>) => {
-    const originalRequest = error.config as InternalAxiosRequestConfig | undefined;
-    const isAuthEndpoint =
-      originalRequest?.url?.includes("/auth/login") ||
-      originalRequest?.url?.includes("/auth/refresh");
-
-    if (
-      error.response?.status !== 401 ||
-      !originalRequest ||
-      originalRequest._retry ||
-      isAuthEndpoint
-    ) {
-      return Promise.reject(error);
-    }
-
-    if (isRefreshing) {
-      return new Promise((resolve, reject) => {
-        pendingQueue.push((token) => {
-          if (!token) {
-            reject(error);
-            return;
-          }
-          originalRequest._retry = true;
-          originalRequest.headers.set("Authorization", `Bearer ${token}`);
-          resolve(platformAdminApiClient(originalRequest));
-        });
-      });
-    }
-
-    originalRequest._retry = true;
-    isRefreshing = true;
-    try {
-      const refreshResponse = await platformAdminApiClient.post<ApiSuccess<{ accessToken: string }>>(
-        "/auth/refresh",
-      );
-      const newToken = refreshResponse.data.data.accessToken;
-      setPlatformAdminAccessToken(newToken);
-      resolveQueue(newToken);
-      originalRequest.headers.set("Authorization", `Bearer ${newToken}`);
-      return platformAdminApiClient(originalRequest);
-    } catch (refreshError) {
-      resolveQueue(null);
-      setPlatformAdminAccessToken(null);
-      return Promise.reject(refreshError);
-    } finally {
-      isRefreshing = false;
-    }
-  },
-);
+registerAuthRefreshInterceptor({
+  client: platformAdminApiClient,
+  getToken: getPlatformAdminAccessToken,
+  setToken: setPlatformAdminAccessToken,
+  refreshUrl: "/auth/refresh",
+});
 
 export interface PlatformAdminLoginPayload {
   username: string;
@@ -159,14 +101,49 @@ export async function setTenantActive(id: number, active: boolean): Promise<Tena
   return response.data.data;
 }
 
+/** XÓA VĨNH VIỄN cửa hàng và TOÀN BỘ dữ liệu nghiệp vụ (đơn hàng, khách hàng, sản phẩm, công nợ,
+ * hóa đơn...) — khác hẳn setTenantActive(false) (chỉ khóa, vẫn giữ dữ liệu). Không thể hoàn tác. */
+export async function deleteTenant(id: number): Promise<void> {
+  await platformAdminApiClient.delete(`/tenants/${id}`);
+}
+
 export interface PlatformAdminRole {
   id: number;
   code: string;
   displayName: string;
+  permissionCodes: string[];
 }
 
 export async function listPlatformAdminRoles(): Promise<PlatformAdminRole[]> {
   const response = await platformAdminApiClient.get<ApiSuccess<PlatformAdminRole[]>>("/roles");
+  return response.data.data;
+}
+
+export interface PlatformAdminPermission {
+  id: number;
+  code: string;
+  description: string;
+}
+
+/** Danh sách toàn bộ permission cho ma trận phân quyền — endpoint riêng dưới /platform-admin vì
+ * token Super Admin không dùng được endpoint /permissions của tenant (2 loại token từ chối lẫn
+ * nhau có chủ đích). */
+export async function listPlatformAdminPermissions(): Promise<PlatformAdminPermission[]> {
+  const response =
+    await platformAdminApiClient.get<ApiSuccess<PlatformAdminPermission[]>>("/roles/permissions");
+  return response.data.data;
+}
+
+/** Sửa tập quyền của 1 vai trò — thay THẾ TOÀN BỘ tập quyền (full replace), ảnh hưởng MỌI cửa
+ * hàng trên hệ thống vì Role là dữ liệu toàn cục. */
+export async function updatePlatformAdminRolePermissions(
+  roleId: number,
+  permissionCodes: string[],
+): Promise<PlatformAdminRole> {
+  const response = await platformAdminApiClient.put<ApiSuccess<PlatformAdminRole>>(
+    `/roles/${roleId}/permissions`,
+    { permissionCodes },
+  );
   return response.data.data;
 }
 
@@ -226,6 +203,13 @@ export async function updateTenantUser(
 
 export async function deactivateTenantUser(tenantId: number, userId: number): Promise<void> {
   await platformAdminApiClient.delete(`/tenants/${tenantId}/users/${userId}`);
+}
+
+/** XÓA VĨNH VIỄN tài khoản — khác hẳn deactivateTenantUser (chỉ khóa đăng nhập, giữ nguyên dữ
+ * liệu). Backend từ chối (409/422) nếu tài khoản đã phát sinh hoạt động thật (đơn hàng, ca làm
+ * việc...) — chỉ xóa được tài khoản "sạch", ngược lại phải dùng khóa thay vì xóa. */
+export async function deleteTenantUser(tenantId: number, userId: number): Promise<void> {
+  await platformAdminApiClient.delete(`/tenants/${tenantId}/users/${userId}/permanent`);
 }
 
 export async function resetTenantUserPassword(

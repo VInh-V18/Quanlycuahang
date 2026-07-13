@@ -18,8 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Dang nhap/refresh/dang xuat/doi mat khau rieng cho PlatformAdmin (Super Admin) - CO CHU DINH
- * khong di qua AuthenticationManager/UserDetailsService chung (chi doc bang users) de tranh moi
- * kha nang nham lan voi tai khoan User thong thuong cua 1 tenant; tu kiem tra mat khau truc tiep.
+ * khong di qua AuthenticationManager/UserDetailsService chung (chi doc bang users) de tranh moi kha
+ * nang nham lan voi tai khoan User thong thuong cua 1 tenant; tu kiem tra mat khau truc tiep.
  * RefreshTokenService (Redis, tokenFamily -> jti) dung chung voi tenant User vi ban than co che
  * rotation khong phu thuoc "thuoc ve ai" - tokenFamily la UUID doc lap moi lan dang nhap.
  */
@@ -49,18 +49,25 @@ public class PlatformAdminAuthService {
   }
 
   public AuthTokens login(String username, String password, String clientIp) {
-    String rateLimitKey = "platform-admin-login:" + clientIp;
-    boolean allowed =
-        rateLimitService.tryConsume(rateLimitKey, LOGIN_MAX_ATTEMPTS, LOGIN_RATE_LIMIT_WINDOW);
-    if (!allowed) {
+    // 2 bucket doc lap (giong AuthService.login) - theo IP va theo username, chan ca 2 huong tan
+    // cong xoay IP nham 1 tai khoan (phat hien khi rieng soat).
+    String ipRateLimitKey = "platform-admin-login:" + clientIp;
+    String userRateLimitKey = "platform-admin-login:user:" + username.trim().toLowerCase();
+    boolean ipAllowed =
+        rateLimitService.tryConsume(ipRateLimitKey, LOGIN_MAX_ATTEMPTS, LOGIN_RATE_LIMIT_WINDOW);
+    boolean userAllowed =
+        rateLimitService.tryConsume(userRateLimitKey, LOGIN_MAX_ATTEMPTS, LOGIN_RATE_LIMIT_WINDOW);
+    if (!ipAllowed || !userAllowed) {
       throw AuthException.rateLimitExceeded();
     }
 
-    PlatformAdmin admin = platformAdminRepository.findByUsernameAndActiveTrue(username).orElse(null);
+    PlatformAdmin admin =
+        platformAdminRepository.findByUsernameAndActiveTrue(username).orElse(null);
     if (admin == null || !passwordEncoder.matches(password, admin.getPasswordHash())) {
       throw AuthException.invalidCredentials();
     }
-    rateLimitService.refund(rateLimitKey, LOGIN_MAX_ATTEMPTS, LOGIN_RATE_LIMIT_WINDOW);
+    rateLimitService.refund(ipRateLimitKey, LOGIN_MAX_ATTEMPTS, LOGIN_RATE_LIMIT_WINDOW);
+    rateLimitService.refund(userRateLimitKey, LOGIN_MAX_ATTEMPTS, LOGIN_RATE_LIMIT_WINDOW);
 
     String tokenFamily = UUID.randomUUID().toString();
     return issueTokenPair(username, tokenFamily);
@@ -90,8 +97,7 @@ public class PlatformAdminAuthService {
       throw AuthException.refreshTokenReuseDetected();
     }
 
-    boolean stillActive =
-        platformAdminRepository.findByUsernameAndActiveTrue(username).isPresent();
+    boolean stillActive = platformAdminRepository.findByUsernameAndActiveTrue(username).isPresent();
     if (!stillActive) {
       throw AuthException.invalidRefreshToken();
     }
@@ -117,7 +123,7 @@ public class PlatformAdminAuthService {
             .findByUsernameAndActiveTrue(username)
             .orElseThrow(AuthException::invalidCredentials);
     if (!passwordEncoder.matches(oldPassword, admin.getPasswordHash())) {
-      throw new BusinessRuleException("AUTH_INVALID_OLD_PASSWORD", "Mat khau cu khong dung");
+      throw new BusinessRuleException("AUTH_INVALID_OLD_PASSWORD", "Mật khẩu cũ không đúng");
     }
     admin.setPasswordHash(passwordEncoder.encode(newPassword));
     platformAdminRepository.save(admin);

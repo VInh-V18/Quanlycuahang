@@ -9,8 +9,10 @@ public class PurchaseOrderItemPriceUpdateRequest {
 
   @NotNull @Positive private BigDecimal unitPrice;
 
-  /** Bat buoc — ghi lai ly do sua (VD: "Nhap nham 15000 thanh 150000") de audit log the hien ro
-   * tai sao gia von/cong no thay doi. */
+  /**
+   * Bat buoc — ghi lai ly do sua (VD: "Nhap nham 15000 thanh 150000") de audit log the hien ro tai
+   * sao gia von/cong no thay doi.
+   */
   @NotBlank private String reason;
 
   public BigDecimal getUnitPrice() {

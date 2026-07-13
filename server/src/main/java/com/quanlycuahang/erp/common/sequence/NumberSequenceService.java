@@ -1,5 +1,6 @@
 package com.quanlycuahang.erp.common.sequence;
 
+import com.quanlycuahang.erp.auth.security.TenantContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -28,6 +29,22 @@ public class NumberSequenceService {
 
   public NumberSequenceService(JdbcTemplate jdbcTemplate) {
     this.jdbcTemplate = jdbcTemplate;
+  }
+
+  /**
+   * Lay so tiep theo cho tenant DANG DANG NHAP (tu TenantContext) - dang goi mac dinh cho moi
+   * Service nghiep vu, nhat quan voi cach TenantScopedEntity tu gan tenant_id; truoc day moi noi
+   * goi phai tu truyen TenantContext.get() bang tay, de truyen nham/thieu (phat hien khi rieng
+   * soat). Bien the nhan tenantId tuong minh ben duoi van giu cho cac luong khong gan voi request
+   * cua tenant (vd Super Admin, tac vu nen).
+   */
+  public long nextValue(String sequenceName) {
+    Long tenantId = TenantContext.get();
+    if (tenantId == null) {
+      throw new IllegalStateException(
+          "Khong xac dinh duoc tenant hien tai de sinh so " + sequenceName);
+    }
+    return nextValue(tenantId, sequenceName);
   }
 
   public long nextValue(Long tenantId, String sequenceName) {

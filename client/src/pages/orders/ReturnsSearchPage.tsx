@@ -10,6 +10,7 @@ import { Money } from "@/components/common/Money";
 import { useAppSelector } from "@/store/hooks";
 import { listReturns, type ReturnListItem } from "@/lib/api/returns";
 import { useCurrentBranchId } from "@/lib/hooks/useCurrentBranchId";
+import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import { getApiErrorMessage } from "@/lib/http/errors";
 
 const PAGE_SIZE = 20;
@@ -38,16 +39,18 @@ export function ReturnsSearchPage() {
     return { from, to: today };
   });
 
+  const debouncedSearch = useDebouncedValue(search);
+
   const params = useMemo(
     () => ({
       branchId,
       page,
       size: PAGE_SIZE,
-      search,
+      search: debouncedSearch,
       from: toIsoDate(range.from),
       to: toIsoDate(range.to),
     }),
-    [branchId, page, search, range],
+    [branchId, page, debouncedSearch, range],
   );
 
   const { data, isLoading, isError, error } = useQuery({

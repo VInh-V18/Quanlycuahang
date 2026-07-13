@@ -47,12 +47,6 @@ public class CustomerController {
         customerService.listWithStats(search, customerGroupId, hasDebt, pageable));
   }
 
-  @GetMapping("/{id}")
-  @PreAuthorize("hasAuthority('customer:view')")
-  public ResponseEntity<ApiResponse<CustomerResponse>> getById(@PathVariable Long id) {
-    return ResponseEntity.ok(ApiResponse.success(customerService.getById(id)));
-  }
-
   @PostMapping
   @PreAuthorize("hasAuthority('customer:create')")
   public ResponseEntity<ApiResponse<CustomerResponse>> create(

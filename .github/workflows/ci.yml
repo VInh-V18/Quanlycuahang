@@ -24,7 +24,8 @@ jobs:
       # Ubuntu co san Docker daemon dang chay -> Testcontainers (DebtRepositoryIT,
       # OrderRepositoryRevenueIT, ProductRepositoryIT — Phase 3/11) chay that, khac voi sandbox
       # phat trien (khong co Docker daemon, xem docs/PROJECT_STATE.md). `verify` cung kich hoat
-      # spotless:check (format code) da cau hinh san trong pom.xml.
+      # spotless:check (format code) + jacoco:check (nguong coverage service/, Prompt #1) da cau
+      # hinh san trong pom.xml — build FAIL neu duoi nguong, khong can them buoc rieng o day.
       - name: mvn verify
         working-directory: server
         run: mvn -B verify
@@ -37,6 +38,42 @@ jobs:
           path: |
             server/target/surefire-reports
             server/target/failsafe-reports
+          retention-days: 7
+
+  # Prompt #9 (P2, CI/CD): job RIENG, TACH KHOI job "backend" o tren cho bo test cach ly tenant
+  # (Prompt #4) - day la nhom test bao mat QUAN TRONG NHAT he thong (ro ri du lieu giua cac cua
+  # hang), can 1 required check RIENG BIET, de y tren GitHub UI (khong bi chim trong hang tram test
+  # khac cua job "backend"), va de cau hinh branch protection rule rieng bat buoc job nay xanh moi
+  # duoc merge. Chay lai TRUNG LAP voi job "backend" (cung test se chay 2 lan) - danh doi CHU DICH
+  # lay do noi bat + kha nang chan merge doc lap, chi vai chuc giay them tren CI ubuntu-latest.
+  tenant-isolation:
+    name: Tenant isolation tests (bat buoc xanh - Prompt #4)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: server/pom.xml
+
+      # -Dit.test (failsafe, khac -Dtest cua surefire) chi chay dung 2 lop IT ve cach ly tenant/
+      # phan quyen - KHONG chay toan bo bo test (da chay o job "backend" song song).
+      # -Djacoco.skip=true: cong coverage 30% (Prompt #1) tinh tren TOAN BO service/, chi chay 2
+      # lop IT o day chac chan duoi nguong - jacoco:check se FAIL SAI (test that ra deu xanh) neu
+      # khong tat, vi job nay khong co muc dich do coverage.
+      - name: mvn verify (chi TenantIsolationIT + PermissionMatrixIT)
+        working-directory: server
+        run: mvn -B verify -Dit.test=TenantIsolationIT,PermissionMatrixIT -DfailIfNoTests=true -Djacoco.skip=true
+
+      - name: Upload failsafe reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tenant-isolation-test-reports
+          path: server/target/failsafe-reports
           retention-days: 7
 
   frontend:
@@ -159,3 +196,62 @@ jobs:
           name: playwright-report
           path: client/playwright-report
           retention-days: 7
+
+  # Prompt #9 (P2, CI/CD): build image Docker 2 tang (multi-stage, xem server/Dockerfile va
+  # client/Dockerfile - da co san tu Phase 12) cho CA server LAN web. Luon BUILD tren moi PR/push
+  # de phat hien loi Dockerfile som (vd thieu dependency luc build, sai duong dan COPY) - CHI PUSH
+  # len registry (GHCR, dung san GITHUB_TOKEN co san, khong can cau hinh secret rieng) khi la push
+  # vao nhanh main HOAC 1 git tag semver (vd v1.2.0) - tranh rac registry bang image cua moi PR thu
+  # nghiem chua duyet.
+  docker-images:
+    name: Build Docker images (server + web)
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - name: server
+            context: server
+            dockerfile: server/Dockerfile
+          - name: web
+            context: client
+            dockerfile: client/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # docker/metadata-action tu sinh tag: luon co sha-<git-sha-ngan>; them tag semver (vd 1.2.0,
+      # 1.2, 1) CHI khi push la 1 git tag dang v*.*.* ; them "latest" CHI khi push vao nhanh main.
+      - name: Extract image metadata (tag theo git SHA + semver)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/quanlycuahang-${{ matrix.name }}
+          tags: |
+            type=sha,prefix=sha-,format=short
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build (+ push khi la push vao main/tag semver)
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}

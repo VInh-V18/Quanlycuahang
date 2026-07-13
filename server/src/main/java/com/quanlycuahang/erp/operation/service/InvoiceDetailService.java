@@ -1,5 +1,7 @@
 package com.quanlycuahang.erp.operation.service;
 
+import static com.quanlycuahang.erp.common.util.Instants.toInstant;
+
 import com.quanlycuahang.erp.auth.security.BranchAccessGuard;
 import com.quanlycuahang.erp.auth.security.TenantContext;
 import com.quanlycuahang.erp.common.dto.ApiResponse;
@@ -15,7 +17,6 @@ import com.quanlycuahang.erp.sales.repository.OrderPaymentRepository;
 import com.quanlycuahang.erp.sales.service.VietQrService;
 import com.quanlycuahang.erp.system.service.SettingsService;
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -84,29 +85,28 @@ public class InvoiceDetailService {
     return response;
   }
 
-  private static Instant toInstant(Object value) {
-    if (value == null) {
-      return null;
-    }
-    if (value instanceof Instant instant) {
-      return instant;
-    }
-    if (value instanceof OffsetDateTime odt) {
-      return odt.toInstant();
-    }
-    if (value instanceof java.sql.Timestamp ts) {
-      return ts.toInstant();
-    }
-    throw new IllegalStateException("Khong the chuyen doi thoi gian: " + value.getClass());
-  }
-
   @Transactional(readOnly = true)
   public InvoiceDetailResponse getById(Long id) {
-    Invoice invoice =
-        invoiceRepository
-            .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay hoa don"));
+    Invoice invoice = findInvoiceOrThrow(id);
+    // IDOR: khac list() o tren (da co branchAccessGuard), endpoint nay truoc day khong kiem tra
+    // chi nhanh cua hoa don - nhan vien thu ngan bi gioi han 1 chi nhanh van xem duoc hoa don (ten/
+    // SDT/email/dia chi khach) cua chi nhanh khac trong CUNG tenant bang cach doan ID (phat hien
+    // khi
+    // rieng soat bao mat).
+    branchAccessGuard.assertAccess(invoice.getOrder().getBranch().getId());
     return buildResponse(invoice);
+  }
+
+  /**
+   * Dung rieng cho luong he thong gui email hoa don nen sau checkout (xem InvoiceEmailService) —
+   * KHONG qua BranchAccessGuard vi khong co "nguoi dang xem" (chay tren thread @Async, khong co
+   * SecurityContext) ma la hanh dong tu dong cua chinh tenant voi hoa don cua minh; id luon lay tu
+   * InvoiceCreatedEvent noi bo (khong phai tham so tu request cua client) nen khong co rui ro IDOR
+   * nhu getById() o tren.
+   */
+  @Transactional(readOnly = true)
+  public InvoiceDetailResponse getByIdForSystemEmail(Long id) {
+    return buildResponse(findInvoiceOrThrow(id));
   }
 
   @Transactional(readOnly = true)
@@ -114,13 +114,20 @@ public class InvoiceDetailService {
     Invoice invoice =
         invoiceRepository
             .findByLookupCode(lookupCode)
-            .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay hoa don"));
+            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hóa đơn"));
     return buildResponse(invoice);
+  }
+
+  private Invoice findInvoiceOrThrow(Long id) {
+    return invoiceRepository
+        .findById(id)
+        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hóa đơn"));
   }
 
   private InvoiceDetailResponse buildResponse(Invoice invoice) {
     Order order = invoice.getOrder();
-    String bankAccountName = settingsService.getValue(null, SettingsService.KEY_BANK_ACCOUNT_NAME, "");
+    String bankAccountName =
+        settingsService.getValue(null, SettingsService.KEY_BANK_ACCOUNT_NAME, "");
     String bankAccountNumber =
         settingsService.getValue(null, SettingsService.KEY_BANK_ACCOUNT_NUMBER, "");
     String bankBin = settingsService.getValue(null, SettingsService.KEY_BANK_BIN, "");

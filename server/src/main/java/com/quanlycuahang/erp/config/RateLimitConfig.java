@@ -17,11 +17,25 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RateLimitConfig {
 
+  /**
+   * Client Redis RIENG cho Bucket4j (thu vien nay can truc tiep RedisClient cua Lettuce, khong dung
+   * lai duoc StringRedisTemplate/LettuceConnectionFactory Spring Boot da tu cau hinh) - truoc day
+   * chi doc host/port, BO QUA spring.data.redis.password: ngay khi dat REDIS_PASSWORD that o
+   * production, client nay se khong xac thuc duoc, am tham lam giam chan brute-force dang nhap va
+   * gioi han 100 req/phut ngung hoat dong (phat hien khi rieng soat bao mat). Chi goi withPassword
+   * khi co cau hinh (rong = moi truong dev khong bat auth, giu nguyen hanh vi cu, tranh gui AUTH
+   * toi Redis khong yeu cau xac thuc).
+   */
   @Bean(destroyMethod = "shutdown")
   public RedisClient rateLimitRedisClient(
       @Value("${spring.data.redis.host}") String host,
-      @Value("${spring.data.redis.port}") int port) {
-    return RedisClient.create(RedisURI.Builder.redis(host, port).build());
+      @Value("${spring.data.redis.port}") int port,
+      @Value("${spring.data.redis.password:}") String password) {
+    RedisURI.Builder uriBuilder = RedisURI.Builder.redis(host, port);
+    if (password != null && !password.isBlank()) {
+      uriBuilder.withPassword((CharSequence) password);
+    }
+    return RedisClient.create(uriBuilder.build());
   }
 
   @Bean

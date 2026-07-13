@@ -8,7 +8,7 @@ public class ChangePasswordRequest {
   @NotBlank private String oldPassword;
 
   @NotBlank
-  @Size(min = 8, message = "Mật khẩu mới tối thiếu 8 ký tự")
+  @Size(min = 8, message = "Mật khẩu mới tối thiểu 8 ký tự")
   private String newPassword;
 
   public String getOldPassword() {

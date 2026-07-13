@@ -36,9 +36,11 @@ public class OrderCreateRequest {
 
   @NotEmpty @Valid private List<OrderLineRequest> lines;
 
-  /** Duoc phep rong (khong bat @NotEmpty) — rong nghia la chua thu tien gi, toan bo tien hang se
+  /**
+   * Duoc phep rong (khong bat @NotEmpty) — rong nghia la chua thu tien gi, toan bo tien hang se
    * thanh cong no phai thu cua khach (bat buoc phai co customerId — xem OrderService, dong kiem tra
-   * unpaid > 0 && customer == null). */
+   * unpaid > 0 && customer == null).
+   */
   @Valid private List<OrderPaymentRequest> payments = new ArrayList<>();
 
   public Long getBranchId() {

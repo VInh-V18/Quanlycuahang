@@ -1,10 +1,11 @@
 package com.quanlycuahang.erp.system.service;
 
+import static com.quanlycuahang.erp.common.util.Instants.toInstant;
+
 import com.quanlycuahang.erp.auth.security.TenantContext;
 import com.quanlycuahang.erp.common.dto.ApiResponse;
 import com.quanlycuahang.erp.system.dto.AuditLogResponse;
 import com.quanlycuahang.erp.system.repository.AuditLogRepository;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -54,21 +55,5 @@ public class AuditLogService {
     response.setBefore((String) row[6]);
     response.setAfter((String) row[7]);
     return response;
-  }
-
-  private static Instant toInstant(Object value) {
-    if (value == null) {
-      return null;
-    }
-    if (value instanceof Instant instant) {
-      return instant;
-    }
-    if (value instanceof OffsetDateTime odt) {
-      return odt.toInstant();
-    }
-    if (value instanceof java.sql.Timestamp ts) {
-      return ts.toInstant();
-    }
-    throw new IllegalStateException("Khong the chuyen doi thoi gian: " + value.getClass());
   }
 }

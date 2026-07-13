@@ -1,5 +1,7 @@
 package com.quanlycuahang.erp.partner.service;
 
+import static com.quanlycuahang.erp.common.util.Instants.toInstant;
+
 import com.quanlycuahang.erp.auth.security.TenantContext;
 import com.quanlycuahang.erp.common.dto.ApiResponse;
 import com.quanlycuahang.erp.common.exception.BusinessRuleException;
@@ -13,8 +15,6 @@ import com.quanlycuahang.erp.partner.mapper.CustomerMapper;
 import com.quanlycuahang.erp.partner.repository.CustomerGroupRepository;
 import com.quanlycuahang.erp.partner.repository.CustomerRepository;
 import java.math.BigDecimal;
-import java.time.Instant;
-import java.time.OffsetDateTime;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -75,34 +75,10 @@ public class CustomerService {
     return response;
   }
 
-  private static Instant toInstant(Object value) {
-    if (value == null) {
-      return null;
-    }
-    if (value instanceof Instant instant) {
-      return instant;
-    }
-    if (value instanceof OffsetDateTime odt) {
-      return odt.toInstant();
-    }
-    if (value instanceof java.sql.Timestamp ts) {
-      return ts.toInstant();
-    }
-    throw new IllegalStateException("Khong the chuyen doi thoi gian: " + value.getClass());
-  }
-
-  @Transactional(readOnly = true)
-  public CustomerResponse getById(Long id) {
-    return customerMapper.toResponse(
-        customerRepository
-            .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay khach hang")));
-  }
-
   @Transactional
   public CustomerResponse create(CustomerRequest request) {
     if (request.getPhone() != null && customerRepository.existsByPhone(request.getPhone())) {
-      throw new BusinessRuleException("CUSTOMER_DUPLICATE_PHONE", "So dien thoai da ton tai");
+      throw new BusinessRuleException("CUSTOMER_DUPLICATE_PHONE", "Số điện thoại đã tồn tại");
     }
     Customer customer = new Customer();
     applyRequest(customer, request);
@@ -114,7 +90,7 @@ public class CustomerService {
     Customer customer =
         customerRepository
             .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay khach hang"));
+            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng"));
     applyRequest(customer, request);
     return customerMapper.toResponse(customerRepository.save(customer));
   }
@@ -129,7 +105,7 @@ public class CustomerService {
       CustomerGroup group =
           customerGroupRepository
               .findById(request.getCustomerGroupId())
-              .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay nhom khach hang"));
+              .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhóm khách hàng"));
       customer.setCustomerGroup(group);
     } else {
       customer.setCustomerGroup(null);

@@ -6,9 +6,9 @@ import java.util.regex.Pattern;
 
 /**
  * Regex cho so dien thoai Viet Nam: di dong sau chuan hoa dau so 2018 (10 so, bat dau
- * 03/05/07/08/09) hoac co dinh (10 so, dau 02 — khach/NCC la doanh nghiep thuong dung so ban).
- * Cho phep nhap dang +84 hoac 0. Rong (null/blank) coi la hop le — dung @NotBlank rieng neu bat
- * buoc nhap.
+ * 03/05/07/08/09) hoac co dinh (10 so, dau 02 — khach/NCC la doanh nghiep thuong dung so ban). Cho
+ * phep nhap dang +84 hoac 0. Rong (null/blank) coi la hop le — dung @NotBlank rieng neu bat buoc
+ * nhap.
  */
 public class PhoneVNValidator implements ConstraintValidator<ValidPhoneVN, String> {
 

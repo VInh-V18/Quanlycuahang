@@ -1,0 +1,9 @@
+# Tu dong nap dashboard JSON trong cung thu muc luc Grafana khoi dong.
+apiVersion: 1
+
+providers:
+  - name: FruitHouse ERP
+    folder: ""
+    type: file
+    options:
+      path: /etc/grafana/provisioning/dashboards

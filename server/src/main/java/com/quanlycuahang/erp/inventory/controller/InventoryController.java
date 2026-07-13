@@ -33,20 +33,30 @@ public class InventoryController {
   @GetMapping
   @PreAuthorize("hasAuthority('inventory:view')")
   public ResponseEntity<ApiResponse<List<InventoryResponse>>> listByBranch(
-      @RequestParam Long branchId, Pageable pageable) {
-    return ResponseEntity.ok(inventoryService.listByBranch(branchId, pageable));
+      @RequestParam Long branchId,
+      @RequestParam(required = false) String search,
+      @RequestParam(required = false) Integer expiryThresholdDays,
+      Pageable pageable) {
+    return ResponseEntity.ok(
+        inventoryService.search(branchId, false, search, expiryThresholdDays, pageable));
   }
 
   @GetMapping("/low-stock")
   @PreAuthorize("hasAuthority('inventory:view')")
   public ResponseEntity<ApiResponse<List<InventoryResponse>>> lowStock(
-      @RequestParam Long branchId, Pageable pageable) {
-    return ResponseEntity.ok(inventoryService.lowStockByBranch(branchId, pageable));
+      @RequestParam Long branchId,
+      @RequestParam(required = false) String search,
+      @RequestParam(required = false) Integer expiryThresholdDays,
+      Pageable pageable) {
+    return ResponseEntity.ok(
+        inventoryService.search(branchId, true, search, expiryThresholdDays, pageable));
   }
 
-  /** Xuat toan bo bang ton kho chi tiet (dung cot voi trang Ton kho) — truoc day nut "Xuat Excel"
-   * o trang nay vo tinh goi nham /reports/inventory-value/export (chi tra ve tong gia tri gop
-   * theo chi nhanh/danh muc, khong phai bang chi tiet tung san pham dang hien tren man hinh). */
+  /**
+   * Xuat toan bo bang ton kho chi tiet (dung cot voi trang Ton kho) — truoc day nut "Xuat Excel" o
+   * trang nay vo tinh goi nham /reports/inventory-value/export (chi tra ve tong gia tri gop theo
+   * chi nhanh/danh muc, khong phai bang chi tiet tung san pham dang hien tren man hinh).
+   */
   @GetMapping("/export")
   @PreAuthorize("hasAuthority('inventory:view') and hasAuthority('report:export')")
   public ResponseEntity<byte[]> export(

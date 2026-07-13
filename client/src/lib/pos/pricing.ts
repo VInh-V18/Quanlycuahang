@@ -127,3 +127,10 @@ function roundToNearestUnit(amount: number, unit: number): number {
   }
   return Math.round(amount / unit) * unit;
 }
+
+/** Kep gia ban sua tay trong POS ve [0, catalogPrice] - khong cho tang gia qua gia niem yet
+ * (Backend chi nhan chiet khau >=0, khong nhan phu thu — B4). Tach ra day de test doc lap voi
+ * PosPage (von can render toan bo component moi goi duoc). */
+export function clampEditablePrice(rawValue: number, catalogPrice: number): number {
+  return Math.min(catalogPrice, Math.max(0, rawValue || 0));
+}

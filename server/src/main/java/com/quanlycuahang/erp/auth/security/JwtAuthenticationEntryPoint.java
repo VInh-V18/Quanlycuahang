@@ -31,7 +31,7 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
     response.setContentType(MediaType.APPLICATION_JSON_VALUE);
     ApiError error =
-        new ApiError("AUTH_UNAUTHENTICATED", "Chua dang nhap hoac phien da het han", Map.of());
+        new ApiError("AUTH_UNAUTHENTICATED", "Chưa đăng nhập hoặc phiên đã hết hạn", Map.of());
     objectMapper.writeValue(response.getWriter(), ApiResponse.error(error));
   }
 }

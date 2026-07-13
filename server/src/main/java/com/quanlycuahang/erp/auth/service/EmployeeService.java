@@ -58,8 +58,13 @@ public class EmployeeService {
 
   @Transactional
   public EmployeeResponse create(EmployeeCreateRequest request) {
-    if (userRepository.existsByUsername(request.getUsername())) {
-      throw new BusinessRuleException("EMPLOYEE_DUPLICATE_USERNAME", "Ten dang nhap da ton tai");
+    // existsByUsernameGlobal (khong phai existsByUsername) - tenant hien tai dang bat @Filter nen
+    // existsByUsername chi thay nhan vien CUA MINH, bo lot username da bi tenant KHAC chiem
+    // (username
+    // la duy nhat toan he thong) va roi vao loi 409 rang buoc DB chung chung thay vi thong bao ro
+    // (phat hien khi rieng soat) - xem UserRepository.existsByUsernameGlobal.
+    if (userRepository.existsByUsernameGlobal(request.getUsername())) {
+      throw new BusinessRuleException("EMPLOYEE_DUPLICATE_USERNAME", "Tên đăng nhập đã tồn tại");
     }
     Set<Role> roles = resolveRoles(request.getRoleIds());
 
@@ -80,12 +85,12 @@ public class EmployeeService {
     User user =
         userRepository
             .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay nhan vien"));
+            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân viên"));
 
     if (Boolean.FALSE.equals(request.getActive())
         && currentUserProvider.getCurrentUser().map(User::getId).map(id::equals).orElse(false)) {
       throw new BusinessRuleException(
-          "EMPLOYEE_CANNOT_DEACTIVATE_SELF", "Khong the tu vo hieu hoa tai khoan dang dang nhap");
+          "EMPLOYEE_CANNOT_DEACTIVATE_SELF", "Không thể tự vô hiệu hóa tài khoản đang đăng nhập");
     }
 
     Set<Long> currentRoleIds =
@@ -96,7 +101,7 @@ public class EmployeeService {
       // nen manager co the tu nang quyen minh/nguoi khac len owner qua chinh endpoint nay (FE co
       // an nut nhung API goc khong chan) — phat hien khi rieng soat.
       throw new PermissionDeniedException(
-          "Ban khong co quyen doi vai tro nhan vien (can quyen employee:manage-permission)");
+          "Bạn không có quyền đổi vai trò nhân viên (cần quyền employee:manage-permission)");
     }
 
     user.setFullName(request.getFullName());
@@ -119,11 +124,11 @@ public class EmployeeService {
     User user =
         userRepository
             .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay nhan vien"));
+            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân viên"));
 
     if (currentUserProvider.getCurrentUser().map(User::getId).map(id::equals).orElse(false)) {
       throw new BusinessRuleException(
-          "EMPLOYEE_CANNOT_DEACTIVATE_SELF", "Khong the tu vo hieu hoa tai khoan dang dang nhap");
+          "EMPLOYEE_CANNOT_DEACTIVATE_SELF", "Không thể tự vô hiệu hóa tài khoản đang đăng nhập");
     }
 
     user.setActive(false);
@@ -134,7 +139,7 @@ public class EmployeeService {
     Set<Role> roles = new HashSet<>(roleRepository.findAllById(roleIds));
     if (roles.size() != roleIds.size()) {
       throw new BusinessRuleException(
-          "EMPLOYEE_INVALID_ROLE", "Mot hoac nhieu vai tro khong ton tai");
+          "EMPLOYEE_INVALID_ROLE", "Một hoặc nhiều vai trò không tồn tại");
     }
     return roles;
   }

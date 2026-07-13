@@ -1,5 +1,7 @@
 package com.quanlycuahang.erp.partner.service;
 
+import static com.quanlycuahang.erp.common.util.Instants.toInstant;
+
 import com.quanlycuahang.erp.auth.security.CurrentUserProvider;
 import com.quanlycuahang.erp.auth.security.TenantContext;
 import com.quanlycuahang.erp.common.exception.BusinessRuleException;
@@ -17,7 +19,6 @@ import com.quanlycuahang.erp.partner.repository.DebtPaymentRepository;
 import com.quanlycuahang.erp.partner.repository.DebtRepository;
 import com.quanlycuahang.erp.partner.repository.SupplierRepository;
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -100,7 +101,9 @@ public class DebtService {
   public List<DebtHistoryEventResponse> history(String direction, Long partnerId) {
     Long customerId = "receivable".equals(direction) ? partnerId : null;
     Long supplierId = "payable".equals(direction) ? partnerId : null;
-    return debtRepository.findHistory(direction, customerId, supplierId, TenantContext.get()).stream()
+    return debtRepository
+        .findHistory(direction, customerId, supplierId, TenantContext.get())
+        .stream()
         .map(
             row -> {
               DebtHistoryEventResponse dto = new DebtHistoryEventResponse();
@@ -120,7 +123,7 @@ public class DebtService {
       Customer customer =
           customerRepository
               .findById(request.getPartnerId())
-              .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay khach hang"));
+              .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng"));
       outstanding =
           debtRepository.findByCustomerIdAndDirectionAndAmountGreaterThanOrderByCreatedAtAsc(
               customer.getId(), "receivable", BigDecimal.ZERO);
@@ -128,16 +131,16 @@ public class DebtService {
       Supplier supplier =
           supplierRepository
               .findById(request.getPartnerId())
-              .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay nha cung cap"));
+              .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhà cung cấp"));
       outstanding =
           debtRepository.findBySupplierIdAndDirectionAndAmountGreaterThanOrderByCreatedAtAsc(
               supplier.getId(), "payable", BigDecimal.ZERO);
     } else {
-      throw new BusinessRuleException("DEBT_INVALID_DIRECTION", "Chieu cong no khong hop le");
+      throw new BusinessRuleException("DEBT_INVALID_DIRECTION", "Chiều công nợ không hợp lệ");
     }
 
     if (outstanding.isEmpty()) {
-      throw new BusinessRuleException("DEBT_NONE_OUTSTANDING", "Doi tac khong con cong no");
+      throw new BusinessRuleException("DEBT_NONE_OUTSTANDING", "Đối tác không còn công nợ");
     }
 
     BigDecimal remaining = request.getAmount();
@@ -164,23 +167,7 @@ public class DebtService {
     if (remaining.compareTo(BigDecimal.ZERO) > 0) {
       throw new BusinessRuleException(
           "DEBT_PAYMENT_EXCEEDS_OUTSTANDING",
-          "So tien thanh toan vuot qua tong cong no con du cua doi tac");
+          "Số tiền thanh toán vượt quá tổng công nợ còn dư của đối tác");
     }
-  }
-
-  private static Instant toInstant(Object value) {
-    if (value == null) {
-      return null;
-    }
-    if (value instanceof Instant instant) {
-      return instant;
-    }
-    if (value instanceof OffsetDateTime odt) {
-      return odt.toInstant();
-    }
-    if (value instanceof java.sql.Timestamp ts) {
-      return ts.toInstant();
-    }
-    throw new IllegalStateException("Khong the chuyen doi thoi gian: " + value.getClass());
   }
 }

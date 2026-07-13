@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Printer } from "lucide-react";
+import { QueryBoundary } from "@/components/common/QueryBoundary";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,7 +9,6 @@ import { InvoiceA4 } from "@/components/invoice/InvoiceA4";
 import { InvoiceK58 } from "@/components/invoice/InvoiceK58";
 import { InvoiceK80 } from "@/components/invoice/InvoiceK80";
 import { getInvoiceById } from "@/lib/api/invoices";
-import { getApiErrorMessage } from "@/lib/http/errors";
 
 type Format = "k58" | "k80" | "a4";
 
@@ -29,7 +29,13 @@ export function InvoiceViewer({
   const [receiptHeightMm, setReceiptHeightMm] = useState(200);
   const contentRef = useRef<HTMLDivElement>(null);
 
-  const { data: invoice, isLoading, isError, error } = useQuery({
+  const {
+    data: invoice,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ["invoice", invoiceId],
     queryFn: () => getInvoiceById(invoiceId),
   });
@@ -73,19 +79,27 @@ export function InvoiceViewer({
       </div>
 
       <div className="rounded-lg bg-muted p-8 print:bg-transparent print:p-0">
-        {isLoading && <Skeleton className="mx-auto h-96 w-full max-w-2xl" />}
-        {isError && <p className="text-center text-destructive">{getApiErrorMessage(error)}</p>}
-        {invoice && (
-          <div ref={contentRef} className="shadow-xl print:shadow-none">
-            {format === "k58" ? (
-              <InvoiceK58 invoice={invoice} />
-            ) : format === "k80" ? (
-              <InvoiceK80 invoice={invoice} />
-            ) : (
-              <InvoiceA4 invoice={invoice} />
-            )}
-          </div>
-        )}
+        <QueryBoundary
+          isLoading={isLoading}
+          isError={isError}
+          error={error}
+          data={invoice}
+          onRetry={() => refetch()}
+          notFoundMessage="Không tìm thấy hóa đơn này — có thể đã bị xoá hoặc bạn không có quyền xem."
+          loadingFallback={<Skeleton className="mx-auto h-96 w-full max-w-2xl" />}
+        >
+          {(invoice) => (
+            <div ref={contentRef} className="shadow-xl print:shadow-none">
+              {format === "k58" ? (
+                <InvoiceK58 invoice={invoice} />
+              ) : format === "k80" ? (
+                <InvoiceK80 invoice={invoice} />
+              ) : (
+                <InvoiceA4 invoice={invoice} />
+              )}
+            </div>
+          )}
+        </QueryBoundary>
       </div>
     </div>
   );

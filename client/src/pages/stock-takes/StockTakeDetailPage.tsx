@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
+import { QueryBoundary } from "@/components/common/QueryBoundary";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,6 +31,7 @@ import {
   type StockTakeItem,
 } from "@/lib/api/stockTakes";
 import { getApiErrorMessage } from "@/lib/http/errors";
+import { formatDateTime } from "@/lib/utils";
 
 const numberFormatter = new Intl.NumberFormat("vi-VN");
 
@@ -48,7 +50,13 @@ export function StockTakeDetailPage() {
   const [onlyDiscrepancy, setOnlyDiscrepancy] = useState(false);
   const [search, setSearch] = useState("");
 
-  const { data: stockTake, isLoading } = useQuery({
+  const {
+    data: stockTake,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ["stock-takes", stockTakeId],
     queryFn: () => getStockTake(stockTakeId),
   });
@@ -146,11 +154,16 @@ export function StockTakeDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stockTake, search, onlyDiscrepancy, counts]);
 
-  if (isLoading || !stockTake) {
-    return <p className="text-sm text-muted-foreground">Đang tải...</p>;
-  }
-
   return (
+    <QueryBoundary
+      isLoading={isLoading}
+      isError={isError}
+      error={error}
+      data={stockTake}
+      onRetry={() => refetch()}
+      notFoundMessage="Không tìm thấy phiếu kiểm kê này — có thể đã bị xoá hoặc bạn không có quyền xem."
+    >
+      {(stockTake) => (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -162,7 +175,7 @@ export function StockTakeDetailPage() {
               </span>
             </h1>
             <p className="text-sm text-muted-foreground">
-              Chốt tồn lúc {new Date(stockTake.createdAt).toLocaleString("vi-VN")}
+              Chốt tồn lúc {formatDateTime(stockTake.createdAt)}
             </p>
           </div>
           <Badge variant={isDraft ? "warning" : "success"}>
@@ -303,5 +316,7 @@ export function StockTakeDetailPage() {
         </CardContent>
       </Card>
     </div>
+      )}
+    </QueryBoundary>
   );
 }

@@ -12,9 +12,11 @@ import org.springframework.data.repository.query.Param;
 
 public interface ReturnRepository extends JpaRepository<Return, Long> {
 
-  /** Lich su phieu tra hang co loc, dung cho trang Tra hang (cung tieu chi loc voi Hoa don/Don
-   * hang — FH-9) — kem so dong san pham da tra (item_count) qua subquery, khong JOIN thang vao
-   * return_items de tranh nhan ban dong khi 1 phieu tra co nhieu dong. */
+  /**
+   * Lich su phieu tra hang co loc, dung cho trang Tra hang (cung tieu chi loc voi Hoa don/Don hang
+   * — FH-9) — kem so dong san pham da tra (item_count) qua subquery, khong JOIN thang vao
+   * return_items de tranh nhan ban dong khi 1 phieu tra co nhieu dong.
+   */
   @Query(
       value =
           "SELECT r.id, r.created_at, o.order_number, COALESCE(c.name, 'Khách lẻ') AS customer_name, "

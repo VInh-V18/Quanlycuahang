@@ -55,13 +55,13 @@ public class RoleService {
     Role role =
         roleRepository
             .findById(roleId)
-            .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay vai tro"));
+            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy vai trò"));
 
     if ("owner".equals(role.getCode())
         && !request.getPermissionCodes().contains("employee:manage-permission")) {
       throw new BusinessRuleException(
           "ROLE_OWNER_MUST_KEEP_PERMISSION_MANAGEMENT",
-          "Vai tro Chu cua hang phai luon giu quyen 'Doi vai tro/quyen cua nhan vien' de tranh tu khoa quyen truy cap");
+          "Vai trò Chủ cửa hàng phải luôn giữ quyền 'Đổi vai trò/quyền của nhân viên' để tránh tự khóa quyền truy cập");
     }
 
     List<Permission> permissions = permissionRepository.findByCodeIn(request.getPermissionCodes());
@@ -70,7 +70,7 @@ public class RoleService {
       Set<String> missing = new HashSet<>(request.getPermissionCodes());
       missing.removeAll(found);
       throw new BusinessRuleException(
-          "ROLE_INVALID_PERMISSION", "Ma quyen khong ton tai: " + missing);
+          "ROLE_INVALID_PERMISSION", "Mã quyền không tồn tại: " + missing);
     }
 
     role.setPermissions(new HashSet<>(permissions));

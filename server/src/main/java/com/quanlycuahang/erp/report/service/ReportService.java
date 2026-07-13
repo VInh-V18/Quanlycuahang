@@ -97,7 +97,8 @@ public class ReportService {
     OffsetDateTime to = endOfDay(filter.getTo());
     Long tenantId = TenantContext.get();
     BigDecimal revenue = orderRepository.sumRevenue(from, to, filter.getBranchId(), tenantId);
-    BigDecimal cogs = orderItemRepository.sumCostOfGoodsSold(from, to, filter.getBranchId(), tenantId);
+    BigDecimal cogs =
+        orderItemRepository.sumCostOfGoodsSold(from, to, filter.getBranchId(), tenantId);
     BigDecimal returnImpact =
         returnRepository.sumReturnImpact(from, to, filter.getBranchId(), tenantId);
     return new GrossProfitResponse(revenue, cogs, returnImpact);

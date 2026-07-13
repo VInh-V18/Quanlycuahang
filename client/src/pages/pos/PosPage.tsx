@@ -19,9 +19,10 @@ import { searchProducts, type Product } from "@/lib/api/products";
 import { getCurrentShift } from "@/lib/api/shifts";
 import { validateVoucher, type VoucherPreview } from "@/lib/api/vouchers";
 import { useCurrentBranchId } from "@/lib/hooks/useCurrentBranchId";
+import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import { getApiErrorMessage } from "@/lib/http/errors";
 import { categoryEmoji } from "@/lib/pos/categoryEmoji";
-import { calculatePricing, type PricingLineInput } from "@/lib/pos/pricing";
+import { calculatePricing, clampEditablePrice, type PricingLineInput } from "@/lib/pos/pricing";
 
 const numberFormatter = new Intl.NumberFormat("vi-VN");
 const ROUNDING_UNIT = 1000;
@@ -77,14 +78,26 @@ export function PosPage() {
   const [orderNote, setOrderNote] = useState("");
   const [invoiceToShow, setInvoiceToShow] = useState<number | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  // Giu NGUYEN 1 key cho ca lan bam lai (retry) cua CUNG 1 lan checkout - truoc day sinh key MOI
+  // moi lan .mutate() chay, khien co che chong trung phia server (Idempotency-Key bat buoc, xem
+  // IdempotencyInterceptor) mat tac dung dung luc can nhat: cashier bam lai "In hoa don" sau khi
+  // mat mang/timeout se tao don TRUNG thay vi duoc nhan dien la thu lai cung 1 yeu cau.
+  const checkoutIdempotencyKeyRef = useRef<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Debounce ngan (250ms, ngan hon mac dinh 400ms cua useDebouncedValue) - POS la man hinh nhay
+  // cam thoi gian nhat (thu ngan go/quet barcode trong luc khach dang cho), truoc day moi ky tu go
+  // vao deu bang 1 request rieng (phat hien khi rieng soat hieu nang); quet barcode van hoat dong
+  // binh thuong vi cac ky tu den qua nhanh, chi request DUY NHAT sau ky tu CUOI cung.
+  const debouncedSearch = useDebouncedValue(search, 250);
+  const debouncedCustomerSearch = useDebouncedValue(customerSearch, 250);
+
   const productsQuery = useQuery({
-    queryKey: ["pos", "products", search, categoryId, branchId],
+    queryKey: ["pos", "products", debouncedSearch, categoryId, branchId],
     queryFn: () =>
       searchProducts({
-        search,
+        search: debouncedSearch,
         categoryId: categoryId === "all" ? undefined : categoryId,
         branchId,
         active: true,
@@ -95,9 +108,9 @@ export function PosPage() {
   const categoriesQuery = useQuery({ queryKey: ["categories"], queryFn: listCategories });
 
   const customersQuery = useQuery({
-    queryKey: ["pos", "customers", customerSearch],
-    queryFn: () => searchCustomers(customerSearch),
-    enabled: customerSearch.trim().length > 0,
+    queryKey: ["pos", "customers", debouncedCustomerSearch],
+    queryFn: () => searchCustomers(debouncedCustomerSearch),
+    enabled: debouncedCustomerSearch.trim().length > 0,
   });
 
   const parkedOrdersQuery = useQuery({
@@ -110,6 +123,15 @@ export function PosPage() {
       if (e.key === "F1") {
         e.preventDefault();
         searchInputRef.current?.focus();
+      }
+      if (e.key === "F8") {
+        // Nut "Treo don" da ghi san nhan "(F8)" tu truoc nhung chua bao gio noi phim tat that -
+        // luon phai bam chuot (phat hien khi ra soat Prompt #5). Giu dung dieu kien disabled cua
+        // nut (khong treo don khi gio hang rong hoac dang treo don khac).
+        e.preventDefault();
+        if (cart.length > 0 && !parkMutation.isPending) {
+          parkMutation.mutate();
+        }
       }
       if (e.key === "F9") {
         e.preventDefault();
@@ -184,7 +206,7 @@ export function PosPage() {
     setCart((prev) =>
       prev.map((l) => {
         if (l.productId !== productId) return l;
-        const clamped = Math.min(l.catalogPrice, Math.max(0, rawValue || 0));
+        const clamped = clampEditablePrice(rawValue, l.catalogPrice);
         return { ...l, unitPrice: clamped };
       }),
     );
@@ -210,6 +232,7 @@ export function PosPage() {
     setAppliedVoucher(null);
     setShippingFee(0);
     setOrderNote("");
+    checkoutIdempotencyKeyRef.current = null;
   }
 
   const voucherMutation = useMutation({
@@ -231,6 +254,9 @@ export function PosPage() {
   // OrderService: unpaid > 0 && customer == null se bi Backend tu choi).
   const checkoutMutation = useMutation({
     mutationFn: () => {
+      if (!checkoutIdempotencyKeyRef.current) {
+        checkoutIdempotencyKeyRef.current = crypto.randomUUID();
+      }
       return createOrder(
         {
           branchId,
@@ -248,7 +274,7 @@ export function PosPage() {
           })),
           payments: [],
         },
-        crypto.randomUUID(),
+        checkoutIdempotencyKeyRef.current,
       );
     },
     onSuccess: (order) => {
@@ -484,6 +510,15 @@ export function PosPage() {
                       Vốn: {numberFormatter.format(line.costPrice)}đ{belowCost && " · Bán dưới giá vốn"}
                     </div>
                   )}
+                  {/* line.stock được lưu từ lúc thêm vào giỏ nhưng trước đây không dùng để cảnh
+                      báo gì — tăng số lượng vượt tồn không có tín hiệu nào trên UI, thu ngân chỉ
+                      biết khi Backend từ chối lúc thanh toán (phát hiện khi rà soát). Chỉ cảnh
+                      báo, không chặn: cửa hàng có thể đang bật "Cho phép bán âm kho". */}
+                  {line.quantity > line.stock && (
+                    <div className="text-xs font-medium text-destructive">
+                      Vượt tồn kho (còn {numberFormatter.format(line.stock)} {line.unit})
+                    </div>
+                  )}
                   <div className="mt-1 flex items-center gap-1">
                     <Button
                       variant="outline"
@@ -496,7 +531,22 @@ export function PosPage() {
                     <Input
                       type="number"
                       value={line.quantity}
-                      onChange={(e) => updateQuantity(line.productId, Number(e.target.value))}
+                      onChange={(e) => {
+                        // Bo qua khi dang go lai so luong (xoa trang de nhap so moi) - o buoc
+                        // trung gian input rong, Number("") = 0 (khong phai NaN) nen truoc day
+                        // updateQuantity() hieu la "ve 0" va XOA LUON DONG hang trong gio hang chi
+                        // vi thu ngan xoa o de go lai (phat hien khi rieng soat).
+                        const raw = e.target.value;
+                        if (raw === "") return;
+                        const parsed = Number(raw);
+                        if (Number.isNaN(parsed)) return;
+                        updateQuantity(line.productId, parsed);
+                      }}
+                      onBlur={(e) => {
+                        if (e.target.value === "") {
+                          updateQuantity(line.productId, line.quantity);
+                        }
+                      }}
                       className="h-6 w-14 text-center text-xs"
                     />
                     <Button
@@ -544,7 +594,10 @@ export function PosPage() {
               type="number"
               min={0}
               value={orderDiscountAmount}
-              onChange={(e) => setOrderDiscountAmount(Number(e.target.value))}
+              // Math.max(0, ...) trong setter - min={0} tren <input type=number> chi la goi y
+              // HTML, go/paste so am van lot vao state va co the keo tong tien khach phai tra
+              // xuong am (phat hien khi rieng soat); ap dung ca cho Phi ship ben duoi.
+              onChange={(e) => setOrderDiscountAmount(Math.max(0, Number(e.target.value) || 0))}
               className="h-7 w-28 text-right"
             />
           </div>
@@ -590,7 +643,7 @@ export function PosPage() {
               type="number"
               min={0}
               value={shippingFee}
-              onChange={(e) => setShippingFee(Number(e.target.value))}
+              onChange={(e) => setShippingFee(Math.max(0, Number(e.target.value) || 0))}
               className="h-7 w-28 text-right"
             />
           </div>

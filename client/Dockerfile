@@ -17,5 +17,8 @@ COPY --from=build /app/dist /usr/share/nginx/html
 
 EXPOSE 80
 
+# 127.0.0.1 (khong phai localhost): wget cua busybox/alpine phan giai localhost ra [::1] (IPv6)
+# truoc, trong khi nginx trong container chi nghe IPv4 - healthcheck luon fail "Connection
+# refused" va container bao unhealthy du trang van chay binh thuong (phat hien khi ra soat).
 HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=5 \
-    CMD wget -qO- http://localhost/ >/dev/null 2>&1 || exit 1
+    CMD wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1

@@ -3,6 +3,7 @@ package com.quanlycuahang.erp.operation.service;
 import com.quanlycuahang.erp.auth.entity.User;
 import com.quanlycuahang.erp.auth.security.BranchAccessGuard;
 import com.quanlycuahang.erp.auth.security.CurrentUserProvider;
+import com.quanlycuahang.erp.auth.security.TenantContext;
 import com.quanlycuahang.erp.common.dto.ApiResponse;
 import com.quanlycuahang.erp.common.exception.BusinessRuleException;
 import com.quanlycuahang.erp.common.exception.PermissionDeniedException;
@@ -72,7 +73,7 @@ public class ShiftService {
         .ifPresent(
             s -> {
               throw new BusinessRuleException(
-                  "SHIFT_ALREADY_OPEN", "Ban dang co 1 ca chua dong, vui long dong ca do truoc");
+                  "SHIFT_ALREADY_OPEN", "Bạn đang có 1 ca chưa đóng, vui lòng đóng ca đó trước");
             });
 
     Branch branch =
@@ -81,7 +82,7 @@ public class ShiftService {
             .orElseThrow(
                 () ->
                     new BusinessRuleException(
-                        "SHIFT_NO_BRANCH", "Tai khoan chua duoc gan chi nhanh nao"));
+                        "SHIFT_NO_BRANCH", "Tài khoản chưa được gán chi nhánh nào"));
 
     Shift shift = new Shift();
     shift.setBranch(branch);
@@ -108,7 +109,7 @@ public class ShiftService {
     Shift shift = requireShift(id);
     if (!"open".equals(shift.getStatus())) {
       throw new BusinessRuleException(
-          "SHIFT_ALREADY_CLOSED", "Ca lam viec nay da duoc dong truoc do");
+          "SHIFT_ALREADY_CLOSED", "Ca làm việc này đã được đóng trước đó");
     }
 
     OffsetDateTime closedAt = OffsetDateTime.now();
@@ -125,7 +126,9 @@ public class ShiftService {
               : shift.getNote() + " | " + request.getNote());
     }
 
-    return toDetail(shiftRepository.save(shift));
+    // saveAndFlush (khong phai save thuong) de Hibernate kiem tra xung dot @Version NGAY, khong
+    // doi den luc commit - dung pattern da co san cho Inventory (chong oversell).
+    return toDetail(shiftRepository.saveAndFlush(shift));
   }
 
   /**
@@ -153,11 +156,11 @@ public class ShiftService {
     Shift shift = requireShift(shiftId);
     if (!"open".equals(shift.getStatus())) {
       throw new BusinessRuleException(
-          "SHIFT_ALREADY_CLOSED", "Khong the ghi thu/chi tien mat cho ca da dong");
+          "SHIFT_ALREADY_CLOSED", "Không thể ghi thu/chi tiền mặt cho ca đã đóng");
     }
     if (!"cash_in".equals(request.getType()) && !"cash_out".equals(request.getType())) {
       throw new BusinessRuleException(
-          "CASH_TRANSACTION_INVALID_TYPE", "Loai giao dich phai la cash_in hoac cash_out");
+          "CASH_TRANSACTION_INVALID_TYPE", "Loại giao dịch phải là cash_in hoặc cash_out");
     }
 
     CashTransaction tx = new CashTransaction();
@@ -180,21 +183,27 @@ public class ShiftService {
     Shift shift =
         shiftRepository
             .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay ca lam viec"));
+            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy ca làm việc"));
     branchAccessGuard.assertAccess(shift.getBranch().getId());
     User currentUser = currentUserProvider.requireCurrentUser();
     if (!BranchAccessGuard.hasFullAccess(currentUser)
         && !shift.getOpenedBy().getId().equals(currentUser.getId())) {
-      throw new PermissionDeniedException("Ban chi duoc thao tac tren ca lam viec cua chinh minh");
+      throw new PermissionDeniedException("Bạn chỉ được thao tác trên ca làm việc của chính mình");
     }
     return shift;
   }
 
   private BigDecimal computeExpectedCash(Shift shift, OffsetDateTime asOf) {
     BigDecimal cashSales = orderPaymentRepository.sumByShiftIdAndMethod(shift.getId(), "cash");
+    // TenantContext.get() (khong phai shift.getTenant().getId()) - shift moi tao (open(), chua tung
+    // duoc doc lai tu DB) co truong tenant (quan he @ManyToOne, khac cot tenantId) van con null
+    // ngay sau save(): @PrePersist tren TenantScopedEntity chi gan tenantId (cot ghi duoc that su),
+    // KHONG dong bo lai truong tenant (chi doc, anh xa cung 1 cot) tren chinh doi tuong dang giu
+    // trong bo nho - goi getTenant().getId() luc do nem NullPointerException (phat hien khi rieng
+    // soat, tai hien duoc bang cach mo 1 ca moi).
     BigDecimal cashRefunds =
         returnRepository.sumCashRefundsInWindow(
-            shift.getBranch().getId(), shift.getOpenedAt(), asOf, shift.getTenant().getId());
+            shift.getBranch().getId(), shift.getOpenedAt(), asOf, TenantContext.get());
     BigDecimal cashIn = cashTransactionRepository.sumByShiftIdAndType(shift.getId(), "cash_in");
     BigDecimal cashOut = cashTransactionRepository.sumByShiftIdAndType(shift.getId(), "cash_out");
     return shift
@@ -216,7 +225,7 @@ public class ShiftService {
     BigDecimal cardSales = orderPaymentRepository.sumByShiftIdAndMethod(shift.getId(), "card");
     BigDecimal cashRefunds =
         returnRepository.sumCashRefundsInWindow(
-            shift.getBranch().getId(), shift.getOpenedAt(), asOf, shift.getTenant().getId());
+            shift.getBranch().getId(), shift.getOpenedAt(), asOf, TenantContext.get());
     BigDecimal cashIn = cashTransactionRepository.sumByShiftIdAndType(shift.getId(), "cash_in");
     BigDecimal cashOut = cashTransactionRepository.sumByShiftIdAndType(shift.getId(), "cash_out");
 

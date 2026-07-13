@@ -32,6 +32,6 @@ public class CurrentUserProvider {
   public User requireCurrentUser() {
     return getCurrentUser()
         .orElseThrow(
-            () -> new ResourceNotFoundException("Khong xac dinh duoc nguoi dung hien tai"));
+            () -> new ResourceNotFoundException("Không xác định được người dùng hiện tại"));
   }
 }

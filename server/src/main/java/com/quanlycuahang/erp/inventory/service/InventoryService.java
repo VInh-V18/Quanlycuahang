@@ -66,6 +66,32 @@ public class InventoryService {
     return response;
   }
 
+  /**
+   * Tim/loc tai server thay vi FE tu loc tren 1 trang da fetch (xem InventoryRepository.search()) -
+   * dung chung cho ca "tat ca" va "chi hang duoi dinh muc" qua tham so onlyLowStock.
+   */
+  @Transactional(readOnly = true)
+  public ApiResponse<List<InventoryResponse>> search(
+      Long branchId,
+      boolean onlyLowStock,
+      String search,
+      Integer expiryThresholdDays,
+      Pageable pageable) {
+    branchAccessGuard.assertAccess(branchId);
+    String normalizedSearch = search == null ? "" : search.trim().toLowerCase();
+    LocalDate expiryThreshold =
+        expiryThresholdDays == null ? null : LocalDate.now().plusDays(expiryThresholdDays);
+    Page<Inventory> page =
+        onlyLowStock
+            ? inventoryRepository.searchLowStock(
+                branchId, normalizedSearch, expiryThreshold, pageable)
+            : inventoryRepository.search(branchId, normalizedSearch, expiryThreshold, pageable);
+    ApiResponse<List<InventoryResponse>> response =
+        ApiResponse.page(page.map(inventoryMapper::toResponse));
+    enrichWithNearestBatch(response.getData(), branchId);
+    return response;
+  }
+
   /** Gan them Lo/HSD gan nhat vao moi dong ton kho (FH-4/FH-7) — 1 truy van cho ca trang. */
   private void enrichWithNearestBatch(List<InventoryResponse> rows, Long branchId) {
     if (rows.isEmpty()) {

@@ -24,7 +24,7 @@ export function InvoiceK80({ invoice }: InvoiceK80Props) {
         <div>Điện thoại: {phoneLine(invoice.branchPhone, invoice.storePhone)}</div>
       </div>
       <hr className="my-1 border-dashed border-black" />
-      <div className="text-center font-bold">HOÁ ĐƠN BÁN HÀNG</div>
+      <div className="text-center font-bold">HÓA ĐƠN BÁN HÀNG</div>
       <div>Số HĐ: {invoice.invoiceNumber}</div>
       <div>{formatInvoiceDate(invoice.issuedAt)}</div>
       <hr className="my-1 border-dashed border-black" />

@@ -20,8 +20,10 @@ public interface InventoryTransactionRepository extends JpaRepository<InventoryT
 
   Optional<InventoryTransaction> findByPurchaseOrderItemId(Long purchaseOrderItemId);
 
-  /** Toan bo lich su bien dong ton (moi loai) cua 1 san pham/chi nhanh, theo dung thu tu thoi
-   * gian - dung de "phat lai" (replay) va tinh lai gia von khi sua gia 1 phieu nhap cu. */
+  /**
+   * Toan bo lich su bien dong ton (moi loai) cua 1 san pham/chi nhanh, theo dung thu tu thoi gian -
+   * dung de "phat lai" (replay) va tinh lai gia von khi sua gia 1 phieu nhap cu.
+   */
   @Query(
       "SELECT t FROM InventoryTransaction t "
           + "WHERE t.product.id = :productId AND t.branch.id = :branchId "

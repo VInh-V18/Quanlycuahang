@@ -8,6 +8,7 @@ import { Money } from "@/components/common/Money";
 import { listPurchaseOrders, type PurchaseOrder } from "@/lib/api/purchaseOrders";
 import { useCurrentBranchId } from "@/lib/hooks/useCurrentBranchId";
 import { getApiErrorMessage } from "@/lib/http/errors";
+import { formatDateTime } from "@/lib/utils";
 
 export function PurchaseOrdersPage() {
   const branchId = useCurrentBranchId();
@@ -25,7 +26,7 @@ export function PurchaseOrdersPage() {
     {
       key: "createdAt",
       header: "Ngày tạo",
-      render: (row) => new Date(row.createdAt).toLocaleString("vi-VN"),
+      render: (row) => formatDateTime(row.createdAt),
     },
     {
       key: "totalAmount",

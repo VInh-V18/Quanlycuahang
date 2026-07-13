@@ -1,16 +1,17 @@
 import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
 import { useForm } from "react-hook-form";
 import { useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
-import { Switch } from "@/components/ui/switch";
 import { FormField } from "@/components/common/FormField";
 import { useToast } from "@/components/ui/use-toast";
 import { login } from "@/lib/api/auth";
+import { platformAdminLogin } from "@/lib/api/platformAdmin";
 import { getBranding } from "@/lib/api/settings";
 import { getApiErrorMessage } from "@/lib/http/errors";
 import { useAppDispatch } from "@/store/hooks";
@@ -28,7 +29,6 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
-  const [rememberDevice, setRememberDevice] = useState(true);
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const location = useLocation();
@@ -50,6 +50,22 @@ export function LoginPage() {
       const from = (location.state as { from?: Location })?.from?.pathname ?? "/";
       navigate(from, { replace: true });
     } catch (error) {
+      // Trang đăng nhập DÙNG CHUNG cho cả Super Admin: nếu không phải tài khoản cửa hàng (401)
+      // hoặc IP đang bị giới hạn ở luồng tenant (429), thử tiếp luồng đăng nhập Super Admin —
+      // 2 luồng vẫn tách biệt hoàn toàn ở Backend (JWT/cookie/filter chain riêng), chỉ gộp ở UI.
+      // Đánh đổi chấp nhận được: mỗi lần Super Admin đăng nhập tốn 1 lượt thử sai của rate-limit
+      // tenant theo IP (mặc định 5 lượt/15 phút) vì username superadmin không tồn tại trong users.
+      const status = isAxiosError(error) ? error.response?.status : undefined;
+      if (status === 401 || status === 429) {
+        try {
+          await platformAdminLogin(values);
+          navigate("/platform-admin", { replace: true });
+          return;
+        } catch {
+          // Rơi xuống thông báo lỗi của luồng tenant bên dưới — thông điệp "sai tên đăng nhập
+          // hoặc mật khẩu" đúng cho cả 2 trường hợp, không tiết lộ tài khoản nào tồn tại.
+        }
+      }
       toast({
         variant: "destructive",
         title: "Đăng nhập thất bại",
@@ -92,12 +108,10 @@ export function LoginPage() {
               description="Tối thiểu 8 ký tự"
               required
             />
-            <div className="flex items-center gap-2">
-              <Switch checked={rememberDevice} onCheckedChange={setRememberDevice} id="remember-device" />
-              <label htmlFor="remember-device" className="text-sm font-medium">
-                Ghi nhớ thiết bị này
-              </label>
-            </div>
+            {/* Công tắc "Ghi nhớ thiết bị này" đã gỡ bỏ: state chỉ tồn tại trên UI, không hề được
+                gửi lên trong payload đăng nhập — một cài đặt trông như liên quan bảo mật nhưng
+                không làm gì cả (phát hiện khi rà soát). Thêm lại khi Backend thật sự hỗ trợ điều
+                chỉnh thời hạn refresh cookie theo lựa chọn này. */}
             <Button type="submit" className="w-full" size="lg" disabled={submitting}>
               {submitting ? "Đang đăng nhập..." : "Đăng nhập"}
             </Button>

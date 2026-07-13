@@ -35,13 +35,13 @@ public final class AverageCostService {
   /**
    * Tinh lai gia von HIEN TAI bang cach phat lai (replay) toan bo lich su giao dich kho cua 1 san
    * pham/chi nhanh theo dung thu tu thoi gian — dung khi sua gia 1 phieu nhap cu (nhap sai gia luc
-   * tao phieu). Gia von chi doi o giao dich type=purchase (dung cong thuc B4 o tren), cac loai
-   * khac (sale, stock_take, customer_return, cancel...) chi lam thay doi ton (transactionsInOrder
-   * da mang dau +/- san, xem noi tao tung loai giao dich).
+   * tao phieu). Gia von chi doi o giao dich type=purchase (dung cong thuc B4 o tren), cac loai khac
+   * (sale, stock_take, customer_return, cancel...) chi lam thay doi ton (transactionsInOrder da
+   * mang dau +/- san, xem noi tao tung loai giao dich).
    *
    * <p>Tra kem ton kho tinh duoc sau khi phat lai — Service goi ham nay PHAI doi chieu voi
-   * Inventory.stock hien tai; neu lech nghia la lich su khong day du/nhat quan, KHONG duoc dung
-   * ket qua gia von tra ve.
+   * Inventory.stock hien tai; neu lech nghia la lich su khong day du/nhat quan, KHONG duoc dung ket
+   * qua gia von tra ve.
    */
   public static ReplayResult replay(
       List<InventoryTransaction> transactionsInOrder,

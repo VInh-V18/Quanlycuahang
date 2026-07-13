@@ -13,7 +13,7 @@ public class TenantCreateRequest {
   @NotBlank private String ownerUsername;
 
   @NotBlank
-  @Size(min = 8, message = "Mat khau phai co it nhat 8 ky tu")
+  @Size(min = 8, message = "Mật khẩu phải có ít nhất 8 ký tự")
   private String ownerPassword;
 
   @NotBlank private String ownerFullName;

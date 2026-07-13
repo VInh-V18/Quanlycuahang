@@ -5,7 +5,7 @@
     <springProfile name="local">
         <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
             <encoder>
-                <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level [%X{correlationId}] %logger{36} - %msg%n</pattern>
+                <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level [%X{correlationId}|tenant=%X{tenantId}|user=%X{userId}|branch=%X{branchId}] %logger{36} - %msg%n</pattern>
             </encoder>
         </appender>
         <root level="INFO">
@@ -13,10 +13,17 @@
         </root>
     </springProfile>
 
+    <!-- Prompt #8 (P2, quan sat): tenantId/userId/branchId do RequestContextMdcFilter gan (chay sau
+         JwtAuthenticationFilter/TenantFilter) - moi dong log JSON o profile docker/prod deu tu co du
+         4 truong (correlationId + 3 truong nay) de loc dung tenant khi 1 cua hang bao loi, khong can
+         sua tung cau log rieng le. -->
     <springProfile name="docker,prod">
         <appender name="CONSOLE_JSON" class="ch.qos.logback.core.ConsoleAppender">
             <encoder class="net.logstash.logback.encoder.LogstashEncoder">
                 <includeMdcKeyName>correlationId</includeMdcKeyName>
+                <includeMdcKeyName>tenantId</includeMdcKeyName>
+                <includeMdcKeyName>userId</includeMdcKeyName>
+                <includeMdcKeyName>branchId</includeMdcKeyName>
             </encoder>
         </appender>
         <root level="INFO">

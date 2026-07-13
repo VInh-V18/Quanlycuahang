@@ -1,0 +1,11 @@
+# Prompt #8 (P2, quan sat, muc tuy chon 6) - scrape /actuator/prometheus cua container "server"
+# QUA MANG NOI BO docker-compose (khong qua nginx, khong publish ra host) - dung ten service
+# "server" lam host vi Docker Compose tu dong cap DNS noi bo giua cac container cung network.
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: fruithouse-erp-server
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["server:8080"]

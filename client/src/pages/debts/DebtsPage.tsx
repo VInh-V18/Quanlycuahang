@@ -38,6 +38,7 @@ import {
   type DebtPartnerAging,
 } from "@/lib/api/debts";
 import { getApiErrorMessage } from "@/lib/http/errors";
+import { formatDate } from "@/lib/utils";
 
 const numberFormatter = new Intl.NumberFormat("vi-VN");
 
@@ -313,7 +314,7 @@ export function DebtsPage() {
                   <div key={i} className="flex items-center justify-between text-sm">
                     <div>
                       <span className="text-muted-foreground">
-                        {new Date(event.eventAt).toLocaleDateString("vi-VN")} ·
+                        {formatDate(event.eventAt)} ·
                       </span>{" "}
                       {event.referenceCode && (
                         <span className="rounded bg-accent px-1.5 py-0.5 text-xs">{event.referenceCode}</span>

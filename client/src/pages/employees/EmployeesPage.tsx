@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { useAppSelector } from "@/store/hooks";
@@ -36,8 +36,10 @@ import {
   updateEmployee,
   type Employee,
 } from "@/lib/api/employees";
-import { listPermissions, listRoles, updateRolePermissions, type Role } from "@/lib/api/roles";
+import { listPermissions, listRoles, type Role } from "@/lib/api/roles";
+import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import { getApiErrorMessage } from "@/lib/http/errors";
+import { formatDateTime } from "@/lib/utils";
 
 const RESOURCE_GROUPS: { title: string; resources: string[] }[] = [
   { title: "Hệ thống & nhân sự", resources: ["employee", "branch", "settings", "audit-log"] },
@@ -192,7 +194,7 @@ function AuditLogDetailDialog({ log, onClose }: { log: AuditLogItem; onClose: ()
         <DialogHeader>
           <DialogTitle>{log.action}</DialogTitle>
           <DialogDescription>
-            {new Date(log.createdAt).toLocaleString("vi-VN")} · {log.userFullName ?? "Hệ thống"}
+            {formatDateTime(log.createdAt)} · {log.userFullName ?? "Hệ thống"}
             {log.entityName && ` · ${log.entityName}${log.entityId ? ` #${log.entityId}` : ""}`}
           </DialogDescription>
         </DialogHeader>
@@ -227,15 +229,17 @@ function AuditLogPanel() {
     return { from, to: today };
   });
 
+  const debouncedSearch = useDebouncedValue(search);
+
   const params = useMemo(
     () => ({
       page,
       size: AUDIT_PAGE_SIZE,
-      search,
+      search: debouncedSearch,
       from: range.from.toISOString().slice(0, 10),
       to: range.to.toISOString().slice(0, 10),
     }),
-    [page, search, range],
+    [page, debouncedSearch, range],
   );
 
   const { data, isLoading, isError, error } = useQuery({
@@ -247,7 +251,7 @@ function AuditLogPanel() {
     {
       key: "createdAt",
       header: "Thời gian",
-      render: (row) => new Date(row.createdAt).toLocaleString("vi-VN"),
+      render: (row) => formatDateTime(row.createdAt),
     },
     { key: "userFullName", header: "Người thực hiện", render: (row) => row.userFullName ?? "Hệ thống" },
     {
@@ -287,7 +291,12 @@ function AuditLogPanel() {
           />
           <DateRangePicker
             value={range}
-            onChange={(r) => r?.from && r?.to && setRange({ from: r.from, to: r.to })}
+            onChange={(r) => {
+              if (r?.from && r?.to) {
+                setRange({ from: r.from, to: r.to });
+                setPage(0);
+              }
+            }}
           />
         </div>
         <DataTable
@@ -316,7 +325,6 @@ export function EmployeesPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const permissionCodes = useAppSelector((state) => state.auth.permissions);
-  const canManagePermissions = permissionCodes.includes("employee:manage-permission");
   const canViewAuditLog = permissionCodes.includes("audit-log:view");
 
   const employeesQuery = useQuery({ queryKey: ["employees"], queryFn: listEmployees });
@@ -343,54 +351,18 @@ export function EmployeesPage() {
     },
   });
 
-  const [matrix, setMatrix] = useState<Record<number, Set<string>>>({});
-  const [dirtyRoles, setDirtyRoles] = useState<Set<number>>(new Set());
-  const matrixInitialized = useRef(false);
-
-  useEffect(() => {
-    if (rolesQuery.data && !matrixInitialized.current) {
-      const next: Record<number, Set<string>> = {};
-      rolesQuery.data.forEach((role) => {
-        next[role.id] = new Set(role.permissionCodes);
-      });
-      setMatrix(next);
-      matrixInitialized.current = true;
-    }
-  }, [rolesQuery.data]);
-
-  function toggleCell(roleId: number, code: string) {
-    if (!canManagePermissions) return;
-    setMatrix((prev) => {
-      const next = { ...prev };
-      const set = new Set(next[roleId] ?? []);
-      if (set.has(code)) {
-        set.delete(code);
-      } else {
-        set.add(code);
-      }
-      next[roleId] = set;
-      return next;
+  // Ma tran quyen la du lieu TOAN CUC dung chung moi cua hang (khong rieng cua tenant nay) - viec
+  // SUA da chuyen han ve Super Admin (platform-admin) sau 1 lo hong bao mat, tab nay CHI XEM.
+  // Toan bo state sua/dirty-tracking/mutation luu ma tran cu da bi go bo cung dot do: no la code
+  // chet (nut Luu khong bao gio hien) va endpoint tenant PUT /roles/{id}/permissions cung khong
+  // con ton tai - giu lai chi gay hieu lam (phat hien khi ra soat).
+  const matrix = useMemo(() => {
+    const next: Record<number, Set<string>> = {};
+    (rolesQuery.data ?? []).forEach((role) => {
+      next[role.id] = new Set(role.permissionCodes);
     });
-    setDirtyRoles((prev) => new Set(prev).add(roleId));
-  }
-
-  const saveMatrixMutation = useMutation({
-    mutationFn: async () => {
-      for (const roleId of dirtyRoles) {
-        await updateRolePermissions(roleId, Array.from(matrix[roleId] ?? []));
-      }
-    },
-    onSuccess: () => {
-      toast({ title: "Đã lưu ma trận phân quyền" });
-      setDirtyRoles(new Set());
-      queryClient.invalidateQueries({ queryKey: ["roles"] });
-    },
-    onError: (err) => {
-      toast({ variant: "destructive", title: "Không thể lưu", description: getApiErrorMessage(err) });
-      matrixInitialized.current = false;
-      queryClient.invalidateQueries({ queryKey: ["roles"] });
-    },
-  });
+    return next;
+  }, [rolesQuery.data]);
 
   const groupedResources = new Set(RESOURCE_GROUPS.flatMap((g) => g.resources));
   const otherResources = Array.from(
@@ -410,15 +382,6 @@ export function EmployeesPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-bold">Nhân viên & phân quyền</h1>
         <div className="flex items-center gap-2">
-          {tab === "permissions" && dirtyRoles.size > 0 && canManagePermissions && (
-            <Button
-              variant="outline"
-              disabled={saveMatrixMutation.isPending}
-              onClick={() => saveMatrixMutation.mutate()}
-            >
-              Lưu thay đổi ({dirtyRoles.size})
-            </Button>
-          )}
           {tab === "employees" && (
             <Button
               size="lg"
@@ -515,6 +478,10 @@ export function EmployeesPage() {
         </Card>
       ) : tab === "permissions" ? (
         <Card>
+          <p className="px-4 pt-4 text-sm text-muted-foreground">
+            Ma trận quyền dùng chung cho mọi cửa hàng trên hệ thống, chỉ xem được ở đây — liên hệ
+            quản trị hệ thống nếu cần thay đổi quyền của 1 vai trò.
+          </p>
           <CardContent className="max-h-[70vh] overflow-auto p-0">
             {/* table thuong (khong dung wrapper <Table>) vi <Table> boc san 1 div overflow-auto
              * rieng — long 2 lop overflow-auto lam sticky "dinh" nham vao div con (khong bao gio
@@ -560,8 +527,7 @@ export function EmployeesPage() {
                                 type="checkbox"
                                 className="h-4 w-4 accent-primary disabled:opacity-40"
                                 checked={matrix[role.id]?.has(perm.code) ?? false}
-                                disabled={!canManagePermissions}
-                                onChange={() => toggleCell(role.id, perm.code)}
+                                disabled
                               />
                             </TableCell>
                           ))}

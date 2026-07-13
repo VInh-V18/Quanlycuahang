@@ -1,6 +1,7 @@
 package com.quanlycuahang.erp.report.controller;
 
 import com.quanlycuahang.erp.common.dto.ApiResponse;
+import com.quanlycuahang.erp.common.exception.ValidationException;
 import com.quanlycuahang.erp.report.dto.DebtAgingBucketResponse;
 import com.quanlycuahang.erp.report.dto.EmployeePerformanceResponse;
 import com.quanlycuahang.erp.report.dto.GrossProfitResponse;
@@ -29,6 +30,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/reports")
 public class ReportController {
+
+  /** 2 nam - du cho doi chieu cung ky nam truoc, van chan duoc khoang ngay vo han. */
+  private static final int MAX_REPORT_RANGE_DAYS = 731;
 
   private final ReportService reportService;
   private final ReportExcelExporter excelExporter;
@@ -192,9 +196,20 @@ public class ReportController {
     };
   }
 
-  /** Kiem tra quyen truy cap chi nhanh chuyen sang ReportService (goi trong @Transactional) —
-   * goi thang o Controller se lam vo lazy-load User.roles vi khong co Session dang mo. */
+  /**
+   * Kiem tra quyen truy cap chi nhanh chuyen sang ReportService (goi trong @Transactional) — goi
+   * thang o Controller se lam vo lazy-load User.roles vi khong co Session dang mo.
+   */
   private ReportFilter filter(LocalDate from, LocalDate to, Long branchId) {
+    // Chan khoang ngay nguoc/vo han - truoc day from/to khong duoc kiem tra gi, 1 request voi
+    // khoang vai chuc nam bat DB quet toan bo lich su giao dich (phat hien khi rieng soat).
+    if (from.isAfter(to)) {
+      throw new ValidationException("Khoảng ngày không hợp lệ: 'Từ ngày' phải trước 'Đến ngày'");
+    }
+    if (to.isAfter(from.plusDays(MAX_REPORT_RANGE_DAYS))) {
+      throw new ValidationException(
+          "Khoảng ngày báo cáo tối đa " + MAX_REPORT_RANGE_DAYS + " ngày, vui lòng thu hẹp lại");
+    }
     ReportFilter filter = new ReportFilter();
     filter.setFrom(from);
     filter.setTo(to);

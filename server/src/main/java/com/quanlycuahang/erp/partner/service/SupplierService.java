@@ -1,5 +1,7 @@
 package com.quanlycuahang.erp.partner.service;
 
+import static com.quanlycuahang.erp.common.util.Instants.toInstant;
+
 import com.quanlycuahang.erp.auth.security.TenantContext;
 import com.quanlycuahang.erp.common.dto.ApiResponse;
 import com.quanlycuahang.erp.common.exception.ResourceNotFoundException;
@@ -10,9 +12,9 @@ import com.quanlycuahang.erp.partner.mapper.SupplierMapper;
 import com.quanlycuahang.erp.partner.repository.DebtRepository;
 import com.quanlycuahang.erp.partner.repository.SupplierRepository;
 import java.math.BigDecimal;
-import java.time.Instant;
-import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -39,8 +41,15 @@ public class SupplierService {
     Page<Supplier> page = supplierRepository.findAll(pageable);
     ApiResponse<java.util.List<SupplierResponse>> response =
         ApiResponse.page(page.map(supplierMapper::toResponse));
-    for (SupplierResponse supplier : response.getData()) {
-      supplier.setOutstandingDebt(debtRepository.sumOutstandingBySupplierId(supplier.getId()));
+    List<Long> supplierIds = response.getData().stream().map(SupplierResponse::getId).toList();
+    if (!supplierIds.isEmpty()) {
+      Map<Long, BigDecimal> outstandingBySupplierId =
+          debtRepository.sumOutstandingBySupplierIds(supplierIds).stream()
+              .collect(Collectors.toMap(row -> (Long) row[0], row -> (BigDecimal) row[1]));
+      for (SupplierResponse supplier : response.getData()) {
+        supplier.setOutstandingDebt(
+            outstandingBySupplierId.getOrDefault(supplier.getId(), BigDecimal.ZERO));
+      }
     }
     return response;
   }
@@ -66,22 +75,6 @@ public class SupplierService {
     return response;
   }
 
-  private static Instant toInstant(Object value) {
-    if (value == null) {
-      return null;
-    }
-    if (value instanceof Instant instant) {
-      return instant;
-    }
-    if (value instanceof OffsetDateTime odt) {
-      return odt.toInstant();
-    }
-    if (value instanceof java.sql.Timestamp ts) {
-      return ts.toInstant();
-    }
-    throw new IllegalStateException("Khong the chuyen doi thoi gian: " + value.getClass());
-  }
-
   @Transactional
   public SupplierResponse create(SupplierRequest request) {
     Supplier supplier = new Supplier();
@@ -94,7 +87,7 @@ public class SupplierService {
     Supplier supplier =
         supplierRepository
             .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay nha cung cap"));
+            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhà cung cấp"));
     applyRequest(supplier, request);
     return supplierMapper.toResponse(supplierRepository.save(supplier));
   }

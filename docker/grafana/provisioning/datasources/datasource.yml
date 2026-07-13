@@ -1,0 +1,9 @@
+# Tu dong dang ky Prometheus lam datasource khi Grafana khoi dong (khong can vao UI tay cau hinh).
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true

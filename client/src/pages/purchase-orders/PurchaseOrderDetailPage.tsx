@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { Pencil } from "lucide-react";
 import { PermissionGate } from "@/components/common/PermissionGate";
+import { QueryBoundary } from "@/components/common/QueryBoundary";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -30,6 +31,7 @@ import {
   type PurchaseOrderItem,
 } from "@/lib/api/purchaseOrders";
 import { getApiErrorMessage } from "@/lib/http/errors";
+import { formatDateTime } from "@/lib/utils";
 
 const numberFormatter = new Intl.NumberFormat("vi-VN");
 
@@ -116,85 +118,102 @@ export function PurchaseOrderDetailPage() {
   const purchaseOrderId = Number(id);
   const [editingItem, setEditingItem] = useState<PurchaseOrderItem | null>(null);
 
-  const { data: purchaseOrder, isLoading } = useQuery({
+  const {
+    data: purchaseOrder,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ["purchase-orders", purchaseOrderId],
     queryFn: () => getPurchaseOrder(purchaseOrderId),
   });
 
-  if (isLoading || !purchaseOrder) {
-    return <p className="text-sm text-muted-foreground">Đang tải...</p>;
-  }
-
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold">
-          Phiếu nhập{" "}
-          <span className="text-muted-foreground">
-            PN{String(purchaseOrder.id).padStart(6, "0")}
-          </span>
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {purchaseOrder.supplierName} · {new Date(purchaseOrder.createdAt).toLocaleString("vi-VN")}
-        </p>
-      </div>
+    <QueryBoundary
+      isLoading={isLoading}
+      isError={isError}
+      error={error}
+      data={purchaseOrder}
+      onRetry={() => refetch()}
+      notFoundMessage="Không tìm thấy phiếu nhập này — có thể đã bị xoá hoặc bạn không có quyền xem."
+    >
+      {(purchaseOrder) => (
+        <div className="space-y-4">
+          <div>
+            <h1 className="text-2xl font-bold">
+              Phiếu nhập{" "}
+              <span className="text-muted-foreground">
+                PN{String(purchaseOrder.id).padStart(6, "0")}
+              </span>
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {purchaseOrder.supplierName} · {formatDateTime(purchaseOrder.createdAt)}
+            </p>
+          </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Sản phẩm</TableHead>
-                <TableHead className="text-right">Số lượng</TableHead>
-                <TableHead className="text-right">Đơn giá nhập</TableHead>
-                <TableHead className="text-right">Thành tiền</TableHead>
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {purchaseOrder.items.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.productName}</TableCell>
-                  <TableCell className="text-right">{numberFormatter.format(item.quantity)}</TableCell>
-                  <TableCell className="text-right">{numberFormatter.format(item.unitPrice)}đ</TableCell>
-                  <TableCell className="text-right">
-                    <Money value={item.unitPrice * item.quantity} />
-                  </TableCell>
-                  <TableCell>
-                    <PermissionGate perm="purchase-order:update">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Sửa giá nhập (nhập sai)"
-                        onClick={() => setEditingItem(item)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    </PermissionGate>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Sản phẩm</TableHead>
+                    <TableHead className="text-right">Số lượng</TableHead>
+                    <TableHead className="text-right">Đơn giá nhập</TableHead>
+                    <TableHead className="text-right">Thành tiền</TableHead>
+                    <TableHead className="w-10" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {purchaseOrder.items.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell className="font-medium">{item.productName}</TableCell>
+                      <TableCell className="text-right">
+                        {numberFormatter.format(item.quantity)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {numberFormatter.format(item.unitPrice)}đ
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Money value={item.unitPrice * item.quantity} />
+                      </TableCell>
+                      <TableCell>
+                        <PermissionGate perm="purchase-order:update">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Sửa giá nhập (nhập sai)"
+                            onClick={() => setEditingItem(item)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </PermissionGate>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
 
-      <div className="ml-auto max-w-xs space-y-1 text-sm">
-        <div className="flex justify-between text-muted-foreground">
-          <span>Tổng tiền hàng</span>
-          <Money value={purchaseOrder.totalAmount} />
-        </div>
-        <div className="flex justify-between text-muted-foreground">
-          <span>Chiết khấu</span>
-          <Money value={purchaseOrder.discountAmount} />
-        </div>
-        <div className="flex justify-between border-t pt-1 text-base font-semibold">
-          <span>Cần trả NCC</span>
-          <Money value={purchaseOrder.totalAmount - purchaseOrder.discountAmount} />
-        </div>
-      </div>
+          <div className="ml-auto max-w-xs space-y-1 text-sm">
+            <div className="flex justify-between text-muted-foreground">
+              <span>Tổng tiền hàng</span>
+              <Money value={purchaseOrder.totalAmount} />
+            </div>
+            <div className="flex justify-between text-muted-foreground">
+              <span>Chiết khấu</span>
+              <Money value={purchaseOrder.discountAmount} />
+            </div>
+            <div className="flex justify-between border-t pt-1 text-base font-semibold">
+              <span>Cần trả NCC</span>
+              <Money value={purchaseOrder.totalAmount - purchaseOrder.discountAmount} />
+            </div>
+          </div>
 
-      {editingItem && <EditPriceDialog item={editingItem} onClose={() => setEditingItem(null)} />}
-    </div>
+          {editingItem && <EditPriceDialog item={editingItem} onClose={() => setEditingItem(null)} />}
+        </div>
+      )}
+    </QueryBoundary>
   );
 }

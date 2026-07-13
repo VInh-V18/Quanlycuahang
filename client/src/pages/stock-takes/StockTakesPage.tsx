@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
@@ -8,6 +8,7 @@ import { DataTable, type DataTableColumn } from "@/components/common/DataTable";
 import { createStockTake, listStockTakes, type StockTake } from "@/lib/api/stockTakes";
 import { useCurrentBranchId } from "@/lib/hooks/useCurrentBranchId";
 import { getApiErrorMessage } from "@/lib/http/errors";
+import { formatDateTime } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 
 /** Route /stock-takes/new — chi tao phieu kiem ke roi chuyen huong ngay, khong co UI rieng
@@ -26,7 +27,15 @@ export function StockTakeNewPage() {
     },
   });
 
+  // useRef (khong phai chi useEffect([])) chan goi 2 lan - React 18 StrictMode (dev) mount/unmount/
+  // remount component ngay lap tuc de bat loi side-effect, khien effect [] chay 2 LAN that su, va
+  // vi than mutationFn nay la POST tao phieu kiem ke (co tac dung phu that, khong idempotent), chay
+  // 2 lan tao ra 2 PHIEU KIEM KE TRUNG NHAU thay vi 1 (phat hien khi rieng soat).
+  const requested = useRef(false);
+
   useEffect(() => {
+    if (requested.current) return;
+    requested.current = true;
     createMutation.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -39,10 +48,14 @@ export function StockTakesPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const branchId = useCurrentBranchId();
+  const [page, setPage] = useState(0);
 
+  // listStockTakes truoc day khong nhan tham so page (luon co dinh page=0/size=20), nen phieu kiem
+  // ke thu 21 tro di khong co cach nao xem duoc du DataTable da san sang render pager - chi thieu
+  // truyen onPageChange/page (phat hien khi rieng soat).
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["stock-takes", branchId],
-    queryFn: () => listStockTakes(branchId),
+    queryKey: ["stock-takes", branchId, page],
+    queryFn: () => listStockTakes(branchId, page),
   });
 
   const createMutation = useMutation({
@@ -61,7 +74,7 @@ export function StockTakesPage() {
     {
       key: "createdAt",
       header: "Chốt tồn lúc",
-      render: (row) => new Date(row.createdAt).toLocaleString("vi-VN"),
+      render: (row) => formatDateTime(row.createdAt),
     },
     {
       key: "status",
@@ -96,6 +109,7 @@ export function StockTakesPage() {
         error={isError ? getApiErrorMessage(error) : null}
         emptyMessage="Chưa có phiếu kiểm kê nào"
         onRowClick={(row) => navigate(`/stock-takes/${row.id}`)}
+        onPageChange={setPage}
       />
     </div>
   );

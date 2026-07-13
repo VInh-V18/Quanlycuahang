@@ -16,7 +16,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Money } from "@/components/common/Money";
 import { useToast } from "@/components/ui/use-toast";
 import { listCategories } from "@/lib/api/categories";
@@ -29,6 +28,7 @@ import {
 } from "@/lib/api/products";
 import { useCurrentBranchId } from "@/lib/hooks/useCurrentBranchId";
 import { getApiErrorMessage } from "@/lib/http/errors";
+import { formatDate } from "@/lib/utils";
 
 const productSchema = z.object({
   name: z.string().min(1, "Vui lòng nhập tên sản phẩm"),
@@ -131,6 +131,21 @@ export function ProductFormPage() {
       toast({ variant: "destructive", title: "Không thể lưu", description: getApiErrorMessage(err) });
     },
   });
+
+  if (isEdit && productQuery.isLoading) {
+    return <p className="text-sm text-muted-foreground">Đang tải...</p>;
+  }
+
+  if (isEdit && productQuery.isError) {
+    return (
+      <div className="space-y-4">
+        <p className="text-sm text-destructive">{getApiErrorMessage(productQuery.error)}</p>
+        <Button variant="outline" onClick={() => navigate("/products")}>
+          Quay lại
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <Form {...form}>
@@ -321,7 +336,7 @@ export function ProductFormPage() {
                     priceHistoryQuery.data.map((h) => (
                       <div key={h.id} className="text-sm">
                         <div className="text-muted-foreground">
-                          {new Date(h.createdAt).toLocaleDateString("vi-VN")}
+                          {formatDate(h.createdAt)}
                         </div>
                         <div>
                           <Money value={h.oldPrice} /> → <Money value={h.newPrice} />
@@ -340,15 +355,10 @@ export function ProductFormPage() {
               </Card>
             )}
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Cho bán khi hết hàng</CardTitle>
-              </CardHeader>
-              <CardContent className="flex items-center gap-2">
-                <Switch disabled checked={false} />
-                <span className="text-sm text-muted-foreground">Theo cài đặt chung: Không</span>
-              </CardContent>
-            </Card>
+            {/* Thẻ "Cho bán khi hết hàng" (Switch tắt cứng) đã được gỡ bỏ: không có cài đặt riêng
+                theo sản phẩm ở Backend — hành vi bán âm kho do cài đặt chung allow_negative_stock
+                quyết định (trang Cài đặt → Bán hàng & tiền tệ); UI chết gây hiểu lầm là có tính
+                năng nhưng không bấm được (phát hiện khi rà soát). */}
           </div>
         </div>
       </form>

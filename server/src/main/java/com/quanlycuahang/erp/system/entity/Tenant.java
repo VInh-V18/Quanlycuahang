@@ -8,8 +8,8 @@ import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.Where;
 
 /**
- * 1 doanh nghiep/cua hang dang ky tren he thong (multi-tenant, kieu KiotViet) — nam TREN Branch:
- * 1 Tenant co the co nhieu Branch (chi nhanh), moi du lieu nghiep vu (san pham, don hang...) deu gan
+ * 1 doanh nghiep/cua hang dang ky tren he thong (multi-tenant, kieu KiotViet) — nam TREN Branch: 1
+ * Tenant co the co nhieu Branch (chi nhanh), moi du lieu nghiep vu (san pham, don hang...) deu gan
  * tenant_id truc tiep de dam bao cach ly tuyet doi giua cac cua hang khac nhau.
  */
 @Entity

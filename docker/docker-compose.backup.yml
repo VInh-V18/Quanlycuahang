@@ -1,0 +1,30 @@
+# Overlay TUY CHON (Prompt #9, P2 CI/CD) - container phu tu dong sao luu Postgres hang ngay (giu
+# 7 ban ngay + 4 ban tuan, xem docker/backup/backup-daily.sh). Bat qua:
+#   docker compose --env-file .env -f docker/docker-compose.yml -f docker/docker-compose.backup.yml up -d
+#
+# Container nay KHONG co Docker CLI/socket (khong can quyen dieu khien container khac, chi ket noi
+# mang toi service "postgres" nhu 1 client Postgres binh thuong qua pg_dump) - giam be mat tan cong
+# so voi phuong an mount Docker socket vao 1 container chi chay dinh ky.
+#
+# Day ra NGOAI may chu (rclone): image postgres:16-alpine KHONG co san rclone. Neu can day ra ngoai
+# tu container nay, tu build 1 image nho hon dua tren postgres:16-alpine them `apk add rclone`, hoac
+# don gian hon: KHONG dung overlay nay, dat scripts/backup.sh (da ho tro rclone qua bien
+# RCLONE_REMOTE trong .env) vao crontab CUA MAY CHU (host), khong phai trong container - `crontab -e`
+# tren host: `30 2 * * * cd /duong/dan/repo && ./scripts/backup.sh`.
+services:
+  backup:
+    image: postgres:16-alpine
+    entrypoint: ["crond", "-f", "-l", "8"]
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+      RCLONE_REMOTE: ${RCLONE_REMOTE:-}
+    volumes:
+      - ./backup/crontab:/etc/crontabs/root:ro
+      - ./backup/backup-daily.sh:/scripts/backup-daily.sh:ro
+      - ../backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
@@ -46,10 +46,17 @@ type FormState = Record<string, string>;
 function useSettingsForm() {
   const query = useQuery({ queryKey: ["settings"], queryFn: getSettings });
   const [form, setForm] = useState<FormState>({});
+  const initialized = useRef(false);
 
   useEffect(() => {
-    if (query.data) {
+    // Chi ap du lieu server 1 LAN DAU (useRef, khong phai moi lan query.data doi) - trang nay co 4
+    // nut "Luu" rieng theo tung tab, moi nut chi gui 1 tap con key; luu xong invalidateQueries lam
+    // query nay fetch lai, va neu useEffect ap lai TOAN BO query.data.settings vao form moi lan nhu
+    // truoc day, no se GHI DE mat het chinh sua chua luu o CAC TAB KHAC (phat hien khi rieng soat).
+    // Sau lan dau, form la du lieu nhap dang cua nguoi dung, khong con dong bo lai tu server nua.
+    if (query.data && !initialized.current) {
       setForm(query.data.settings);
+      initialized.current = true;
     }
   }, [query.data]);
 

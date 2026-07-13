@@ -2,6 +2,7 @@ package com.quanlycuahang.erp.common.web;
 
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.BucketConfiguration;
+import io.github.bucket4j.ConsumptionProbe;
 import io.github.bucket4j.distributed.BucketProxy;
 import io.github.bucket4j.distributed.proxy.ProxyManager;
 import java.nio.charset.StandardCharsets;
@@ -30,9 +31,18 @@ public class RateLimitService {
   }
 
   /**
-   * Hoan lai 1 luot da tru boi {@link #tryConsume} — dung cho truong hop gioi han chi nham chan
-   * mot loai "lan thu" cu the (vd dang nhap SAI) nhung tryConsume() phai chay TRUOC khi biet ket
-   * qua (de chan brute-force ngay ca khi toan la lan thu dung). Khong vuot qua capacity ban dau
+   * Nhu {@link #tryConsume} nhung tra ve ca so nano-giay con lai truoc khi bucket co luot moi
+   * (ConsumptionProbe.getNanosToWaitForRefill()) — dung de dat header Retry-After chinh xac thay vi
+   * doan chung chung theo do dai ca so (Prompt #3: bat lai ApiRateLimitFilter phan tang).
+   */
+  public ConsumptionProbe consume(String key, long capacity, Duration period) {
+    return bucket(key, capacity, period).tryConsumeAndReturnRemaining(1);
+  }
+
+  /**
+   * Hoan lai 1 luot da tru boi {@link #tryConsume} — dung cho truong hop gioi han chi nham chan mot
+   * loai "lan thu" cu the (vd dang nhap SAI) nhung tryConsume() phai chay TRUOC khi biet ket qua
+   * (de chan brute-force ngay ca khi toan la lan thu dung). Khong vuot qua capacity ban dau
    * (addTokens tu gioi han o muc Bandwidth, khac forceAddTokens).
    *
    * @param key phai giong khoa da dung o tryConsume tuong ung

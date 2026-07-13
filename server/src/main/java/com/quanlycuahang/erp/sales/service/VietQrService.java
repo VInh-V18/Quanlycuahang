@@ -39,7 +39,12 @@ public class VietQrService {
 
   public String generatePayload(BigDecimal amount, String purpose) {
     return generatePayload(
-        defaultBankBin, defaultAccountNumber, defaultMerchantName, defaultMerchantCity, amount, purpose);
+        defaultBankBin,
+        defaultAccountNumber,
+        defaultMerchantName,
+        defaultMerchantCity,
+        amount,
+        purpose);
   }
 
   /**

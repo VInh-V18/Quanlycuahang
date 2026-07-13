@@ -8,6 +8,7 @@ import com.quanlycuahang.erp.platform.service.TenantAdminService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -46,5 +47,12 @@ public class TenantAdminController {
       @PathVariable Long id, @Valid @RequestBody TenantActiveUpdateRequest request) {
     return ResponseEntity.ok(
         ApiResponse.success(tenantAdminService.setActive(id, request.getActive())));
+  }
+
+  /** XOA VINH VIEN (khac PUT .../active - chi khoa, van giu du lieu). Xem TenantAdminService. */
+  @DeleteMapping("/{id}")
+  public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
+    tenantAdminService.deleteTenant(id);
+    return ResponseEntity.ok(ApiResponse.success(null));
   }
 }

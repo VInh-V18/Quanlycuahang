@@ -17,8 +17,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Quan ly nhom khach hang (VIP/Than thiet/Doanh nghiep/Moi...) — dung cho bo loc + form o trang
- * Khach hang (FH-11). CRUD dung chung quyen voi Khach hang (khong tach quyen rieng). */
+/**
+ * Quan ly nhom khach hang (VIP/Than thiet/Doanh nghiep/Moi...) — dung cho bo loc + form o trang
+ * Khach hang (FH-11). CRUD dung chung quyen voi Khach hang (khong tach quyen rieng).
+ */
 @RestController
 @RequestMapping("/api/v1/customer-groups")
 public class CustomerGroupController {

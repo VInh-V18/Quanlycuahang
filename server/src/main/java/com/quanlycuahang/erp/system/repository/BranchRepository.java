@@ -8,7 +8,9 @@ public interface BranchRepository extends JpaRepository<Branch, Long> {
 
   List<Branch> findByActiveTrueOrderByNameAsc();
 
-  /** Dung boi Super Admin (platform/service/TenantUserAdminService) - TenantContext luon null luc
-   * do nen can loc tenant_id tuong minh, khong dua vao @Filter. */
+  /**
+   * Dung boi Super Admin (platform/service/TenantUserAdminService) - TenantContext luon null luc do
+   * nen can loc tenant_id tuong minh, khong dua vao @Filter.
+   */
   List<Branch> findByTenantId(Long tenantId);
 }

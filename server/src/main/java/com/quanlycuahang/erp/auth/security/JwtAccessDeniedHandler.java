@@ -31,7 +31,7 @@ public class JwtAccessDeniedHandler implements AccessDeniedHandler {
     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
     response.setContentType(MediaType.APPLICATION_JSON_VALUE);
     ApiError error =
-        new ApiError("PERMISSION_DENIED", "Ban khong co quyen thuc hien hanh dong nay", Map.of());
+        new ApiError("PERMISSION_DENIED", "Bạn không có quyền thực hiện hành động này", Map.of());
     objectMapper.writeValue(response.getWriter(), ApiResponse.error(error));
   }
 }

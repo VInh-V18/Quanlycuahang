@@ -25,10 +25,9 @@ springdoc:
   swagger-ui:
     enabled: false
 
-management:
-  endpoint:
-    health:
-      show-details: never
+# (Prompt #8, P2 quan sat) show-details: always cua application.yml GIU NGUYEN o prod - ranh gioi
+# bao mat cho /actuator/** la MANG (khong nginx proxy ra Internet, port khong publish ra host, xem
+# docker/nginx.conf + docker-compose.yml), khong phai an chi tiet health o tang ung dung.
 
 logging:
   level:
