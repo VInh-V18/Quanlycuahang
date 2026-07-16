@@ -1,8 +1,16 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Download, MoreHorizontal, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,15 +29,94 @@ import { DataTable, type DataTableColumn } from "@/components/common/DataTable";
 import { DateRangePicker } from "@/components/common/DateRangePicker";
 import { Money } from "@/components/common/Money";
 import { StatusBadge } from "@/components/common/StatusBadge";
-import { exportOrders, listOrders, type OrderListItem } from "@/lib/api/orders";
+import { useToast } from "@/components/ui/use-toast";
+import { cancelOrder, exportOrders, listOrders, type OrderListItem } from "@/lib/api/orders";
 import { useCurrentBranchId } from "@/lib/hooks/useCurrentBranchId";
 import { useDebouncedValue } from "@/lib/hooks/useDebouncedValue";
 import { getApiErrorMessage } from "@/lib/http/errors";
+import { useAppSelector } from "@/store/hooks";
 
 const PAGE_SIZE = 20;
 
 function toIsoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
+}
+
+function OrderRowActions({ row }: { row: OrderListItem }) {
+  const permissions = useAppSelector((state) => state.auth.permissions);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+
+  const cancelMutation = useMutation({
+    mutationFn: () => cancelOrder(row.id),
+    onSuccess: () => {
+      toast({ title: "Đã hủy đơn hàng" });
+      setCancelDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+    },
+    onError: (err) => {
+      toast({ variant: "destructive", title: "Không thể hủy đơn", description: getApiErrorMessage(err) });
+    },
+  });
+
+  const canCancel =
+    permissions.includes("order:void") && (row.status === "completed" || row.status === "draft");
+
+  return (
+    <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem asChild>
+            <Link to={`/orders/${row.id}`}>Xem chi tiết</Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            asChild
+            disabled={row.status === "cancelled" || row.status === "fully_returned"}
+          >
+            <Link to={`/orders/${row.id}/return`}>Tạo phiếu trả hàng</Link>
+          </DropdownMenuItem>
+          {canCancel && (
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onSelect={(e) => {
+                e.preventDefault();
+                setCancelDialogOpen(true);
+              }}
+            >
+              Hủy đơn
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Xác nhận hủy đơn {row.orderNumber}?</DialogTitle>
+          <DialogDescription>
+            Hàng sẽ được hoàn lại vào tồn kho, công nợ liên quan (nếu chưa thu) sẽ được xóa. Chỉ hủy
+            được đơn tạo trong ngày hôm nay.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>
+            Đóng
+          </Button>
+          <Button
+            variant="destructive"
+            disabled={cancelMutation.isPending}
+            onClick={() => cancelMutation.mutate()}
+          >
+            Xác nhận hủy đơn
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 export function OrdersPage() {
@@ -110,20 +197,7 @@ export function OrdersPage() {
     {
       key: "id",
       header: "",
-      render: (row) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem asChild disabled={row.status === "cancelled" || row.status === "fully_returned"}>
-              <Link to={`/orders/${row.id}/return`}>Tạo phiếu trả hàng</Link>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
+      render: (row) => <OrderRowActions row={row} />,
     },
   ];
 

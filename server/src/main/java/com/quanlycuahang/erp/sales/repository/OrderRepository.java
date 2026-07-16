@@ -1,6 +1,7 @@
 package com.quanlycuahang.erp.sales.repository;
 
 import com.quanlycuahang.erp.sales.entity.Order;
+import jakarta.persistence.LockModeType;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -9,6 +10,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -19,6 +21,15 @@ public interface OrderRepository
   String REVENUE_STATUSES = "('completed','partially_returned','fully_returned')";
 
   Optional<Order> findByOrderNumber(String orderNumber);
+
+  /**
+   * Khoa pessimistic khi sua don da hoan tat (OrderEditService.editOrder) - tranh Sua don/Tra
+   * hang/Huy don chay dong thoi tren cung 1 don doc cung trang thai cu roi cung ghi de (mirror
+   * OrderItemRepository.findByIdForUpdate).
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT o FROM Order o WHERE o.id = :id")
+  Optional<Order> findByIdForUpdate(@Param("id") Long id);
 
   Page<Order> findByBranchIdOrderByCreatedAtDesc(Long branchId, Pageable pageable);
 

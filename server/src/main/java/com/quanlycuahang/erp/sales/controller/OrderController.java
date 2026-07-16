@@ -1,10 +1,13 @@
 package com.quanlycuahang.erp.sales.controller;
 
+import com.quanlycuahang.erp.common.audit.Audited;
 import com.quanlycuahang.erp.common.dto.ApiResponse;
 import com.quanlycuahang.erp.report.excel.ReportExcelExporter;
+import com.quanlycuahang.erp.sales.dto.EditOrderRequest;
 import com.quanlycuahang.erp.sales.dto.OrderCreateRequest;
 import com.quanlycuahang.erp.sales.dto.OrderListItemResponse;
 import com.quanlycuahang.erp.sales.dto.OrderResponse;
+import com.quanlycuahang.erp.sales.service.OrderEditService;
 import com.quanlycuahang.erp.sales.service.OrderService;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
@@ -17,6 +20,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -32,10 +36,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class OrderController {
 
   private final OrderService orderService;
+  private final OrderEditService orderEditService;
   private final ReportExcelExporter excelExporter;
 
-  public OrderController(OrderService orderService, ReportExcelExporter excelExporter) {
+  public OrderController(
+      OrderService orderService,
+      OrderEditService orderEditService,
+      ReportExcelExporter excelExporter) {
     this.orderService = orderService;
+    this.orderEditService = orderEditService;
     this.excelExporter = excelExporter;
   }
 
@@ -107,6 +116,22 @@ public class OrderController {
   @GetMapping("/{id}")
   @PreAuthorize("hasAuthority('order:view')")
   public ResponseEntity<ApiResponse<OrderResponse>> getById(@PathVariable Long id) {
+    return ResponseEntity.ok(ApiResponse.success(orderService.getById(id)));
+  }
+
+  @PostMapping("/{id}/cancel")
+  @PreAuthorize("hasAuthority('order:void')")
+  @Audited(action = "ORDER_CANCEL", entityName = "Order")
+  public ResponseEntity<ApiResponse<OrderResponse>> cancel(@PathVariable Long id) {
+    return ResponseEntity.ok(ApiResponse.success(orderService.cancelOrder(id)));
+  }
+
+  @PutMapping("/{id}")
+  @PreAuthorize("hasAuthority('order:edit')")
+  @Audited(action = "ORDER_EDIT", entityName = "Order")
+  public ResponseEntity<ApiResponse<OrderResponse>> edit(
+      @PathVariable Long id, @Valid @RequestBody EditOrderRequest request) {
+    orderEditService.editOrder(id, request);
     return ResponseEntity.ok(ApiResponse.success(orderService.getById(id)));
   }
 }

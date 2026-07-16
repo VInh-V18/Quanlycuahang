@@ -17,7 +17,7 @@ import org.hibernate.annotations.Where;
 /**
  * The kho — nguon chan ly duy nhat cho moi bien dong ton (B4): ton hien tai luon tinh lai duoc tu
  * lich su bang nay. type: purchase, sale, supplier_return, customer_return, stock_take, transfer,
- * cancel.
+ * cancel, order_edit.
  */
 @Entity
 @Table(name = "inventory_transactions")

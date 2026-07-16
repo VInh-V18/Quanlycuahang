@@ -6,18 +6,23 @@ import com.quanlycuahang.erp.auth.security.BranchAccessGuard;
 import com.quanlycuahang.erp.auth.security.CurrentUserProvider;
 import com.quanlycuahang.erp.auth.security.TenantContext;
 import com.quanlycuahang.erp.common.dto.ApiResponse;
+import com.quanlycuahang.erp.common.exception.BusinessRuleException;
 import com.quanlycuahang.erp.common.exception.ResourceNotFoundException;
 import com.quanlycuahang.erp.common.metrics.BusinessMetrics;
 import com.quanlycuahang.erp.common.sequence.NumberSequenceService;
 import com.quanlycuahang.erp.common.web.IdempotencyService;
 import com.quanlycuahang.erp.inventory.entity.Inventory;
+import com.quanlycuahang.erp.inventory.entity.InventoryTransaction;
 import com.quanlycuahang.erp.inventory.repository.InventoryRepository;
+import com.quanlycuahang.erp.inventory.repository.InventoryTransactionRepository;
 import com.quanlycuahang.erp.operation.entity.Invoice;
 import com.quanlycuahang.erp.operation.entity.Shift;
 import com.quanlycuahang.erp.operation.repository.InvoiceRepository;
 import com.quanlycuahang.erp.operation.repository.ShiftRepository;
 import com.quanlycuahang.erp.partner.entity.Customer;
+import com.quanlycuahang.erp.partner.entity.Debt;
 import com.quanlycuahang.erp.partner.repository.CustomerRepository;
+import com.quanlycuahang.erp.partner.repository.DebtRepository;
 import com.quanlycuahang.erp.product.entity.Product;
 import com.quanlycuahang.erp.product.repository.ProductRepository;
 import com.quanlycuahang.erp.promotion.entity.Voucher;
@@ -29,6 +34,7 @@ import com.quanlycuahang.erp.sales.dto.OrderListItemResponse;
 import com.quanlycuahang.erp.sales.dto.OrderPaymentResponse;
 import com.quanlycuahang.erp.sales.dto.OrderResponse;
 import com.quanlycuahang.erp.sales.entity.Order;
+import com.quanlycuahang.erp.sales.entity.OrderItem;
 import com.quanlycuahang.erp.sales.pricing.OrderLineInput;
 import com.quanlycuahang.erp.sales.pricing.OrderPricingRequest;
 import com.quanlycuahang.erp.sales.pricing.OrderPricingResult;
@@ -44,6 +50,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -77,6 +84,8 @@ public class OrderService {
   private final OrderPaymentRepository orderPaymentRepository;
   private final ProductRepository productRepository;
   private final InventoryRepository inventoryRepository;
+  private final InventoryTransactionRepository inventoryTransactionRepository;
+  private final DebtRepository debtRepository;
   private final BranchRepository branchRepository;
   private final CustomerRepository customerRepository;
   private final ShiftRepository shiftRepository;
@@ -99,6 +108,8 @@ public class OrderService {
       OrderPaymentRepository orderPaymentRepository,
       ProductRepository productRepository,
       InventoryRepository inventoryRepository,
+      InventoryTransactionRepository inventoryTransactionRepository,
+      DebtRepository debtRepository,
       BranchRepository branchRepository,
       CustomerRepository customerRepository,
       ShiftRepository shiftRepository,
@@ -119,6 +130,8 @@ public class OrderService {
     this.orderPaymentRepository = orderPaymentRepository;
     this.productRepository = productRepository;
     this.inventoryRepository = inventoryRepository;
+    this.inventoryTransactionRepository = inventoryTransactionRepository;
+    this.debtRepository = debtRepository;
     this.branchRepository = branchRepository;
     this.customerRepository = customerRepository;
     this.shiftRepository = shiftRepository;
@@ -308,6 +321,86 @@ public class OrderService {
             .findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng"));
     branchAccessGuard.assertAccess(order.getBranch().getId());
+    return toResponse(order);
+  }
+
+  /**
+   * Huy don da hoan tat (order:void) — phuc dung tu ban truoc Prompt #2 (bi xoa nham la dead code
+   * vi khong con FE nao goi, xem docs/PROJECT_STATE.md/permission-matrix.md). Chi huy duoc don TAO
+   * TRONG NGAY (Asia/Ho_Chi_Minh) — tranh sua nguoc lich su bao cao tai chinh cac ky truoc. Hoan
+   * kho theo (quantity - returnedQuantity) tung dong (khong hoan lai phan da tung tra hang truoc
+   * do). Chan huy neu cong no lien quan da duoc thu MOT PHAN (khong co cach doi chieu an toan mot
+   * khoan da thu do voi don khong con hieu luc) — con no chua thu gi thi zero luon (khong xoa dong
+   * Debt, giu vet lich su).
+   */
+  @Transactional
+  public OrderResponse cancelOrder(Long id) {
+    Order order =
+        orderRepository
+            .findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng"));
+    branchAccessGuard.assertAccess(order.getBranch().getId());
+
+    OrderStatus current = OrderStatus.fromValue(order.getStatus());
+    if (!OrderStatus.canTransition(current, OrderStatus.CANCELLED)) {
+      throw new BusinessRuleException(
+          "ORDER_CANCEL_NOT_ALLOWED",
+          "Không thể hủy đơn ở trạng thái hiện tại: " + order.getStatus());
+    }
+
+    ZoneId zone = ZoneId.of("Asia/Ho_Chi_Minh");
+    LocalDate orderDate = order.getCreatedAt().atZone(zone).toLocalDate();
+    LocalDate today = OffsetDateTime.now(zone).toLocalDate();
+    if (!orderDate.equals(today)) {
+      throw new BusinessRuleException(
+          "ORDER_CANCEL_WINDOW_EXPIRED", "Chỉ được hủy đơn trong ngày tạo đơn");
+    }
+
+    List<Debt> orderDebts =
+        debtRepository.findByReferenceTypeAndReferenceIdOrderByIdAsc("order", order.getId());
+    boolean hasPartialPayment =
+        orderDebts.stream().anyMatch(d -> d.getAmount().compareTo(d.getOriginalAmount()) != 0);
+    if (hasPartialPayment) {
+      throw new BusinessRuleException(
+          "ORDER_CANCEL_DEBT_ALREADY_PAID",
+          "Không thể hủy đơn vì công nợ liên quan đã được thu một phần, vui lòng xử lý công nợ"
+              + " trước");
+    }
+
+    List<InventoryTransaction> stockMovements = new ArrayList<>();
+    var canceller = currentUserProvider.getCurrentUser();
+    for (OrderItem item : orderItemRepository.findByOrderId(order.getId())) {
+      BigDecimal remainingQty = item.getQuantity().subtract(item.getReturnedQuantity());
+      if (remainingQty.compareTo(BigDecimal.ZERO) <= 0) {
+        continue;
+      }
+      Inventory inventory =
+          inventoryRepository
+              .findByProductIdAndBranchId(item.getProduct().getId(), order.getBranch().getId())
+              .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tồn kho"));
+      inventory.setStock(inventory.getStock().add(remainingQty));
+      inventoryRepository.saveAndFlush(inventory);
+
+      InventoryTransaction transaction = new InventoryTransaction();
+      transaction.setProduct(item.getProduct());
+      transaction.setBranch(order.getBranch());
+      transaction.setType("cancel");
+      transaction.setQuantity(remainingQty);
+      transaction.setUnitCost(item.getCostPriceSnapshot());
+      transaction.setReferenceType("order");
+      transaction.setReferenceId(order.getId());
+      canceller.ifPresent(transaction::setCreatedBy);
+      stockMovements.add(transaction);
+    }
+    inventoryTransactionRepository.saveAll(stockMovements);
+
+    for (Debt debt : orderDebts) {
+      debt.setAmount(BigDecimal.ZERO);
+      debtRepository.save(debt);
+    }
+
+    order.setStatus(OrderStatus.CANCELLED.getValue());
+    orderRepository.save(order);
     return toResponse(order);
   }
 

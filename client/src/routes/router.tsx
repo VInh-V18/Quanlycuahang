@@ -49,6 +49,9 @@ const StockTakeDetailPage = lazy(() =>
 const OrdersPage = lazy(() =>
   import("@/pages/orders/OrdersPage").then((m) => ({ default: m.OrdersPage })),
 );
+const OrderDetailPage = lazy(() =>
+  import("@/pages/orders/OrderDetailPage").then((m) => ({ default: m.OrderDetailPage })),
+);
 const ReturnCreatePage = lazy(() =>
   import("@/pages/orders/ReturnCreatePage").then((m) => ({ default: m.ReturnCreatePage })),
 );
@@ -163,6 +166,14 @@ const router = createBrowserRouter([
         element: withSuspense(
           <RequirePermission perm="order:view">
             <OrdersPage />
+          </RequirePermission>,
+        ),
+      },
+      {
+        path: "/orders/:id",
+        element: withSuspense(
+          <RequirePermission perm="order:view">
+            <OrderDetailPage />
           </RequirePermission>,
         ),
       },

@@ -105,3 +105,24 @@ export async function createOrder(
   });
   return response.data.data;
 }
+
+export async function cancelOrder(id: number): Promise<OrderDetail> {
+  const response = await apiClient.post<ApiSuccess<OrderDetail>>(`/orders/${id}/cancel`);
+  return response.data.data;
+}
+
+export interface EditOrderLine {
+  productId: number;
+  quantity: number;
+  unitPrice: number;
+  lineDiscountAmount: number;
+}
+
+export interface EditOrderRequest {
+  lines: EditOrderLine[];
+}
+
+export async function editOrder(id: number, request: EditOrderRequest): Promise<OrderDetail> {
+  const response = await apiClient.put<ApiSuccess<OrderDetail>>(`/orders/${id}`, request);
+  return response.data.data;
+}
