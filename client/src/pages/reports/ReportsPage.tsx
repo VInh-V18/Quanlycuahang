@@ -270,7 +270,10 @@ export function ReportsPage() {
                       width={80}
                     />
                     <Tooltip
-                      formatter={(value: number, name: string) => [`${numberFormatter.format(value)} đ`, name]}
+                      formatter={(value: number, name: string) => [
+                        `${numberFormatter.format(value)} đ`,
+                        name === "revenue" ? "Doanh thu" : "Lợi nhuận gộp",
+                      ]}
                       contentStyle={{
                         borderRadius: 8,
                         borderColor: "hsl(var(--border))",
