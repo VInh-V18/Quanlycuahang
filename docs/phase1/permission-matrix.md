@@ -74,6 +74,7 @@ Cột "Chuỗi authority" là giá trị lưu trong bảng `permissions.code`, d
 | `stock-take:view` | Xem phiếu kiểm kê | ✅ | ✅ | — | — | ✅ | ✅ |
 | `stock-take:create` | Tạo phiếu kiểm kê | ✅ | ✅ | — | — | ✅ | — |
 | `stock-take:approve` | Duyệt phiếu cân bằng chênh lệch | ✅ | ✅ | — | — | — | — |
+| `inventory:cost-price-override` | Ghi đè giá vốn tồn kho (khác biến động bình quân gia quyền tự động khi nhập hàng) | ✅ | ✅ | — | — | — | — |
 
 ### Đối tác (khách hàng / nhà cung cấp / công nợ)
 

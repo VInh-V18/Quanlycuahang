@@ -14,6 +14,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { NumberInput } from "@/components/common/NumberInput";
 import {
   Table,
   TableBody,
@@ -39,9 +40,9 @@ const numberFormatter = new Intl.NumberFormat("vi-VN");
 interface EditableLine {
   productId: number;
   productName: string;
-  quantity: string;
-  unitPrice: string;
-  lineDiscountAmount: string;
+  quantity: number;
+  unitPrice: number;
+  lineDiscountAmount: number;
 }
 
 export function OrderDetailPage() {
@@ -76,9 +77,9 @@ export function OrderDetailPage() {
       order.items.map((item) => ({
         productId: item.productId,
         productName: item.productName,
-        quantity: String(item.quantity),
-        unitPrice: String(item.unitPrice),
-        lineDiscountAmount: String(item.discountAmount),
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        lineDiscountAmount: item.discountAmount,
       })),
     );
     setEditing(true);
@@ -112,28 +113,26 @@ export function OrderDetailPage() {
       {
         productId: product.id,
         productName: product.name,
-        quantity: "1",
-        unitPrice: String(product.sellPrice),
-        lineDiscountAmount: "0",
+        quantity: 1,
+        unitPrice: product.sellPrice,
+        lineDiscountAmount: 0,
       },
     ]);
     setProductSearch("");
   }
 
-  const previewTotal = lines.reduce((sum, line) => {
-    const qty = Number(line.quantity) || 0;
-    const price = Number(line.unitPrice) || 0;
-    const discount = Number(line.lineDiscountAmount) || 0;
-    return sum + qty * price - discount;
-  }, 0);
+  const previewTotal = lines.reduce(
+    (sum, line) => sum + line.quantity * line.unitPrice - line.lineDiscountAmount,
+    0,
+  );
 
   const editMutation = useMutation({
     mutationFn: () => {
       const payload: EditOrderLine[] = lines.map((line) => ({
         productId: line.productId,
-        quantity: Number(line.quantity),
-        unitPrice: Number(line.unitPrice),
-        lineDiscountAmount: Number(line.lineDiscountAmount) || 0,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+        lineDiscountAmount: line.lineDiscountAmount,
       }));
       return editOrder(orderId, { lines: payload });
     },
@@ -264,41 +263,36 @@ export function OrderDetailPage() {
                       <TableRow key={line.productId}>
                         <TableCell className="font-medium">{line.productName}</TableCell>
                         <TableCell className="text-right">
-                          <Input
-                            type="number"
+                          <NumberInput
                             min={0.01}
-                            step="0.01"
                             value={line.quantity}
-                            onChange={(e) => updateLine(index, { quantity: e.target.value })}
+                            onValueChange={(v) => updateLine(index, { quantity: v ?? 0 })}
                             className="ml-auto w-24 text-right"
                           />
                         </TableCell>
                         <TableCell className="text-right">
-                          <Input
-                            type="number"
+                          <NumberInput
+                            allowDecimal={false}
                             min={0}
-                            step="1"
                             value={line.unitPrice}
-                            onChange={(e) => updateLine(index, { unitPrice: e.target.value })}
+                            onValueChange={(v) => updateLine(index, { unitPrice: v ?? 0 })}
                             className="ml-auto w-28 text-right"
                           />
                         </TableCell>
                         <TableCell className="text-right">
-                          <Input
-                            type="number"
+                          <NumberInput
+                            allowDecimal={false}
                             min={0}
-                            step="1"
                             value={line.lineDiscountAmount}
-                            onChange={(e) =>
-                              updateLine(index, { lineDiscountAmount: e.target.value })
+                            onValueChange={(v) =>
+                              updateLine(index, { lineDiscountAmount: v ?? 0 })
                             }
                             className="ml-auto w-24 text-right"
                           />
                         </TableCell>
                         <TableCell className="text-right">
                           {numberFormatter.format(
-                            (Number(line.quantity) || 0) * (Number(line.unitPrice) || 0) -
-                              (Number(line.lineDiscountAmount) || 0),
+                            line.quantity * line.unitPrice - line.lineDiscountAmount,
                           )}
                         </TableCell>
                         <TableCell>

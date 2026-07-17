@@ -1,13 +1,18 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Controller, useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
+import { FolderCog } from "lucide-react";
 import { z } from "zod";
+import { useAppSelector } from "@/store/hooks";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CategoryManagerDialog } from "@/components/products/CategoryManagerDialog";
 import { Form, FormControl, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { FormField } from "@/components/common/FormField";
+import { NumberField } from "@/components/common/NumberField";
+import { NumberInput } from "@/components/common/NumberInput";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -19,6 +24,7 @@ import {
 import { Money } from "@/components/common/Money";
 import { useToast } from "@/components/ui/use-toast";
 import { listCategories } from "@/lib/api/categories";
+import { updateCostPrice } from "@/lib/api/inventory";
 import {
   createProduct,
   getPriceHistory,
@@ -55,11 +61,38 @@ export function ProductFormPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const branchId = useCurrentBranchId();
+  const permissions = useAppSelector((state) => state.auth.permissions);
+  const canManageCategories =
+    permissions.includes("category:create") ||
+    permissions.includes("category:update") ||
+    permissions.includes("category:delete");
+  const canOverrideCostPrice = permissions.includes("inventory:cost-price-override");
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [costPriceInput, setCostPriceInput] = useState<number | null>(null);
 
   const productQuery = useQuery({
     queryKey: ["products", id, branchId],
     queryFn: () => getProduct(Number(id), branchId),
     enabled: isEdit,
+  });
+
+  useEffect(() => {
+    setCostPriceInput(productQuery.data?.costPrice ?? null);
+  }, [productQuery.data?.costPrice]);
+
+  const costPriceMutation = useMutation({
+    mutationFn: (newCostPrice: number) => updateCostPrice(Number(id), branchId, newCostPrice),
+    onSuccess: () => {
+      toast({ title: "Đã cập nhật giá vốn" });
+      queryClient.invalidateQueries({ queryKey: ["products", id, branchId] });
+    },
+    onError: (err) => {
+      toast({
+        variant: "destructive",
+        title: "Không thể cập nhật giá vốn",
+        description: getApiErrorMessage(err),
+      });
+    },
   });
 
   const priceHistoryQuery = useQuery({
@@ -193,9 +226,20 @@ export function ProductFormPage() {
                     name="categoryId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>
-                          Danh mục<span className="text-destructive"> *</span>
-                        </FormLabel>
+                        <div className="flex items-center justify-between">
+                          <FormLabel>
+                            Danh mục<span className="text-destructive"> *</span>
+                          </FormLabel>
+                          {canManageCategories && (
+                            <button
+                              type="button"
+                              className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                              onClick={() => setShowCategoryManager(true)}
+                            >
+                              <FolderCog className="h-3 w-3" />+ Danh mục mới
+                            </button>
+                          )}
+                        </div>
                         <Select value={field.value} onValueChange={field.onChange}>
                           <FormControl>
                             <SelectTrigger>
@@ -255,23 +299,45 @@ export function ProductFormPage() {
               <CardContent className="grid grid-cols-3 gap-4">
                 <div>
                   <FormLabel>Giá vốn</FormLabel>
-                  <div className="mt-2 flex h-10 items-center rounded-md border bg-muted px-3 text-sm">
-                    {productQuery.data?.costPrice != null ? (
-                      <Money value={productQuery.data.costPrice} />
-                    ) : (
-                      "—"
-                    )}
-                  </div>
+                  {isEdit && canOverrideCostPrice ? (
+                    <div className="mt-2 flex gap-2">
+                      <NumberInput
+                        value={costPriceInput}
+                        onValueChange={setCostPriceInput}
+                        min={0}
+                        placeholder="—"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={costPriceInput == null || costPriceMutation.isPending}
+                        onClick={() => costPriceInput != null && costPriceMutation.mutate(costPriceInput)}
+                      >
+                        Cập nhật
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="mt-2 flex h-10 items-center rounded-md border bg-muted px-3 text-sm">
+                      {productQuery.data?.costPrice != null ? (
+                        <Money value={productQuery.data.costPrice} />
+                      ) : (
+                        "—"
+                      )}
+                    </div>
+                  )}
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Bình quân gia quyền — chỉ đổi khi nhập hàng
+                    {canOverrideCostPrice
+                      ? "Bình quân gia quyền, tự đổi khi nhập hàng — có thể ghi đè trực tiếp tại đây"
+                      : "Bình quân gia quyền — chỉ đổi khi nhập hàng"}
                   </p>
                 </div>
-                <FormField
+                <NumberField
                   control={form.control}
                   name="sellPrice"
                   label="Giá bán / đơn vị"
-                  type="number"
                   required
+                  min={0}
                 />
                 <Controller
                   control={form.control}
@@ -306,12 +372,13 @@ export function ProductFormPage() {
                 <CardTitle>Tồn kho</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-2 gap-4">
-                <FormField
+                <NumberField
                   control={form.control}
                   name="minStock"
                   label="Tồn tối thiểu"
-                  type="number"
                   required
+                  allowDecimal={false}
+                  min={0}
                 />
                 <div>
                   <FormLabel>Tồn hiện tại — Kho hiện tại</FormLabel>
@@ -362,6 +429,11 @@ export function ProductFormPage() {
           </div>
         </div>
       </form>
+      <CategoryManagerDialog
+        open={showCategoryManager}
+        onOpenChange={setShowCategoryManager}
+        canManage={canManageCategories}
+      />
     </Form>
   );
 }

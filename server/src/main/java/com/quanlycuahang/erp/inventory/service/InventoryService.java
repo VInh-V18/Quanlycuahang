@@ -3,6 +3,8 @@ package com.quanlycuahang.erp.inventory.service;
 import com.quanlycuahang.erp.auth.security.BranchAccessGuard;
 import com.quanlycuahang.erp.auth.security.TenantContext;
 import com.quanlycuahang.erp.common.dto.ApiResponse;
+import com.quanlycuahang.erp.common.exception.BusinessRuleException;
+import com.quanlycuahang.erp.common.exception.ResourceNotFoundException;
 import com.quanlycuahang.erp.inventory.dto.InventoryResponse;
 import com.quanlycuahang.erp.inventory.dto.InventoryTransactionResponse;
 import com.quanlycuahang.erp.inventory.entity.Inventory;
@@ -11,6 +13,8 @@ import com.quanlycuahang.erp.inventory.mapper.InventoryMapper;
 import com.quanlycuahang.erp.inventory.repository.InventoryBatchRepository;
 import com.quanlycuahang.erp.inventory.repository.InventoryRepository;
 import com.quanlycuahang.erp.inventory.repository.InventoryTransactionRepository;
+import com.quanlycuahang.erp.product.repository.ProductRepository;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
@@ -32,18 +36,21 @@ public class InventoryService {
   private final InventoryBatchRepository inventoryBatchRepository;
   private final InventoryMapper inventoryMapper;
   private final BranchAccessGuard branchAccessGuard;
+  private final ProductRepository productRepository;
 
   public InventoryService(
       InventoryRepository inventoryRepository,
       InventoryTransactionRepository inventoryTransactionRepository,
       InventoryBatchRepository inventoryBatchRepository,
       InventoryMapper inventoryMapper,
-      BranchAccessGuard branchAccessGuard) {
+      BranchAccessGuard branchAccessGuard,
+      ProductRepository productRepository) {
     this.inventoryRepository = inventoryRepository;
     this.inventoryTransactionRepository = inventoryTransactionRepository;
     this.inventoryBatchRepository = inventoryBatchRepository;
     this.inventoryMapper = inventoryMapper;
     this.branchAccessGuard = branchAccessGuard;
+    this.productRepository = productRepository;
   }
 
   @Transactional(readOnly = true)
@@ -92,7 +99,16 @@ public class InventoryService {
     return response;
   }
 
-  /** Gan them Lo/HSD gan nhat vao moi dong ton kho (FH-4/FH-7) — 1 truy van cho ca trang. */
+  // Nguong canh HSD (ngay) + nhan trang thai — 1 nguon DUY NHAT dung chung cho man hinh Ton kho
+  // (InventoryController/export) va truoc day ca client/src/pages/inventory/InventoryPage.tsx tu
+  // tinh lai doc lap (phat hien khi rieng soat, 2 noi co the lech nhau neu sua nguong 1 cho quen
+  // cho kia).
+  private static final int EXPIRY_WARNING_DAYS = 7;
+
+  /**
+   * Gan them Lo/HSD gan nhat vao moi dong ton kho (FH-4/FH-7) — 1 truy van cho ca trang. Nhan tien
+   * the tinh luon stockValue/status vi ca 2 deu can nearestExpiryDate da gan xong o day.
+   */
   private void enrichWithNearestBatch(List<InventoryResponse> rows, Long branchId) {
     if (rows.isEmpty()) {
       return;
@@ -108,7 +124,20 @@ public class InventoryService {
         row.setNearestBatchCode((String) batch[1]);
         row.setNearestExpiryDate(toLocalDate(batch[2]));
       }
+      row.setStockValue(row.getStock().multiply(row.getCostPrice()));
+      row.setStatus(computeStatus(row));
     }
+  }
+
+  private static String computeStatus(InventoryResponse row) {
+    LocalDate expiry = row.getNearestExpiryDate();
+    if (expiry != null && !expiry.isAfter(LocalDate.now().plusDays(EXPIRY_WARNING_DAYS))) {
+      return "near_expiry";
+    }
+    if (row.getStock().compareTo(row.getMinStock()) <= 0) {
+      return "low_stock";
+    }
+    return "ok";
   }
 
   private static LocalDate toLocalDate(Object value) {
@@ -134,5 +163,36 @@ public class InventoryService {
         inventoryTransactionRepository.findByProductIdAndBranchIdOrderByCreatedAtDesc(
             productId, branchId, pageable);
     return ApiResponse.page(page.map(inventoryMapper::toTransactionResponse));
+  }
+
+  /**
+   * Ghi de truc tiep gia von hien tai (inventory:cost-price-override, tinh nang moi) — KHAC voi
+   * bien dong binh quan gia quyen tu dong qua AverageCostService khi nhan hang nhap: day la ghi de
+   * thu cong, khong tinh lai tu lich su. Khoa pessimistic truoc khi set (mirror
+   * StockTakeService.approve()) de tranh doi voi 1 phieu nhap dang nhan hang cung luc. KHONG ghi
+   * InventoryTransaction — bang do chi ghi nhan bien dong SO LUONG (quantity NOT NULL), ghi de gia
+   * von khong co delta so luong nen khong hop ban chat "the kho"; audit trail dua vao @Audited o
+   * Controller.
+   */
+  @Transactional
+  public void overrideCostPrice(Long productId, Long branchId, BigDecimal newCostPrice) {
+    branchAccessGuard.assertAccess(branchId);
+    if (newCostPrice.compareTo(BigDecimal.ZERO) < 0) {
+      throw new BusinessRuleException("INVENTORY_COST_PRICE_NEGATIVE", "Giá vốn không được âm");
+    }
+    if (!productRepository.existsById(productId)) {
+      throw new ResourceNotFoundException("Không tìm thấy sản phẩm");
+    }
+    Inventory inventory =
+        inventoryRepository.findByProductIdAndBranchIdForUpdate(productId, branchId).orElse(null);
+    if (inventory == null) {
+      inventoryRepository.initializeIfAbsent(TenantContext.get(), productId, branchId);
+      inventory =
+          inventoryRepository
+              .findByProductIdAndBranchIdForUpdate(productId, branchId)
+              .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tồn kho"));
+    }
+    inventory.setCostPrice(newCostPrice);
+    inventoryRepository.save(inventory);
   }
 }

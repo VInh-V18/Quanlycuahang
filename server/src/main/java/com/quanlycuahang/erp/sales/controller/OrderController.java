@@ -2,6 +2,7 @@ package com.quanlycuahang.erp.sales.controller;
 
 import com.quanlycuahang.erp.common.audit.Audited;
 import com.quanlycuahang.erp.common.dto.ApiResponse;
+import com.quanlycuahang.erp.common.exception.ValidationException;
 import com.quanlycuahang.erp.report.excel.ReportExcelExporter;
 import com.quanlycuahang.erp.sales.dto.EditOrderRequest;
 import com.quanlycuahang.erp.sales.dto.OrderCreateRequest;
@@ -13,8 +14,6 @@ import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -80,37 +79,50 @@ public class OrderController {
       @RequestParam(required = false) String status,
       @RequestParam(required = false) Long cashierId,
       @RequestParam(required = false, defaultValue = "") String search) {
-    List<OrderListItemResponse> data =
-        orderService
-            .list(
-                branchId,
-                from,
-                to,
-                status,
-                cashierId,
-                search,
-                org.springframework.data.domain.PageRequest.of(0, 10_000))
-            .getData();
+    ApiResponse<List<OrderListItemResponse>> page =
+        orderService.list(
+            branchId,
+            from,
+            to,
+            status,
+            cashierId,
+            search,
+            org.springframework.data.domain.PageRequest.of(0, 10_000));
+    // Xuat toi da 10.000 dong/lan (SXSSFWorkbook streaming, khong phai gioi han RAM) — neu ket
+    // qua thuc te vuot con so nay, file se bi CAT NGANG ma nguoi dung khong biet, tuong nham la
+    // du lieu day (phat hien khi rieng soat). Bao loi ro rang thay vi xuat lang le thieu dong.
+    if (page.getMeta().getTotal() > 10_000) {
+      throw new ValidationException(
+          "Có "
+              + page.getMeta().getTotal()
+              + " đơn hàng, vượt quá 10.000 dòng cho phép xuất 1 lần — vui lòng thu hẹp khoảng ngày/bộ lọc");
+    }
+    List<OrderListItemResponse> data = page.getData();
     byte[] file =
         excelExporter.export(
             "Don hang",
-            List.of("Mã đơn", "Thời gian", "Khách hàng", "Thu ngân", "Tổng tiền", "Trạng thái"),
+            List.of(
+                "Mã đơn",
+                "Thời gian",
+                "Khách hàng",
+                "SĐT",
+                "Thu ngân",
+                "Tổng tiền",
+                "Thanh toán",
+                "Trạng thái"),
             data,
             row ->
                 new Object[] {
                   row.getOrderNumber(),
                   row.getCreatedAt(),
                   row.getCustomerName(),
+                  row.getCustomerPhone(),
                   row.getCashierName(),
                   row.getTotalAmount(),
-                  row.getStatus()
+                  row.getPaymentLabel(),
+                  row.getStatusLabel()
                 });
-    return ResponseEntity.ok()
-        .contentType(
-            MediaType.parseMediaType(
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"don-hang.xlsx\"")
-        .body(file);
+    return excelExporter.toXlsxResponse(file, "don-hang.xlsx");
   }
 
   @GetMapping("/{id}")

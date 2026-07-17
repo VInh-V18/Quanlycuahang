@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NumberInput } from "@/components/common/NumberInput";
 import {
   Select,
   SelectContent,
@@ -167,11 +168,11 @@ export function CustomerFormDialog({
           </div>
           <div>
             <Label htmlFor="customer-debt-limit">Hạn mức nợ</Label>
-            <Input
+            <NumberInput
               id="customer-debt-limit"
-              type="number"
+              min={0}
               value={form.debtLimit ?? 0}
-              onChange={(e) => setForm({ ...form, debtLimit: Number(e.target.value) })}
+              onValueChange={(v) => setForm({ ...form, debtLimit: v ?? 0 })}
             />
           </div>
           <div>

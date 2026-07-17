@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NumberInput } from "@/components/common/NumberInput";
 import {
   Select,
   SelectContent,
@@ -70,11 +71,11 @@ function OpenShiftCard() {
       <CardContent className="max-w-sm space-y-3">
         <div>
           <Label htmlFor="opening-cash">Tiền mặt đầu ca</Label>
-          <Input
+          <NumberInput
             id="opening-cash"
-            type="number"
+            min={0}
             value={openingCash}
-            onChange={(e) => setOpeningCash(Number(e.target.value))}
+            onValueChange={(v) => setOpeningCash(v ?? 0)}
           />
         </div>
         <div>
@@ -134,11 +135,11 @@ function CashTransactionDialog({ shiftId, onClose }: { shiftId: number; onClose:
           </div>
           <div>
             <Label htmlFor="tx-amount">Số tiền</Label>
-            <Input
+            <NumberInput
               id="tx-amount"
-              type="number"
+              min={0}
               value={amount}
-              onChange={(e) => setAmount(Number(e.target.value))}
+              onValueChange={(v) => setAmount(v ?? 0)}
             />
           </div>
           <div>
@@ -196,11 +197,11 @@ function CloseShiftDialog({ shift, onClose }: { shift: ShiftDetail; onClose: () 
           </div>
           <div>
             <Label htmlFor="actual-cash">Tiền mặt thực đếm được</Label>
-            <Input
+            <NumberInput
               id="actual-cash"
-              type="number"
+              min={0}
               value={actualCash}
-              onChange={(e) => setActualCash(Number(e.target.value))}
+              onValueChange={(v) => setActualCash(v ?? 0)}
             />
           </div>
           <div className="flex items-center justify-between rounded-md border p-3 text-sm">

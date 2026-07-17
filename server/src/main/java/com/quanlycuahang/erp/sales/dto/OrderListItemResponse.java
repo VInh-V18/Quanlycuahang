@@ -17,6 +17,21 @@ public class OrderListItemResponse {
   private boolean hasDebt;
   private List<String> paymentMethods;
 
+  /**
+   * Nhan tieng Viet cua status (vd "completed" -> "Hoàn thành") — tinh 1 lan o
+   * OrderService.toListItem(), dung chung cho man hinh Don hang (StatusBadge tu dich rieng qua
+   * client/src/lib/orderStatus.ts, khong doc field nay) lan file Excel xuat ra (truoc day
+   * OrderController tu dich lai rieng, phat hien khi rieng soat co the lech nhau).
+   */
+  private String statusLabel;
+
+  /**
+   * "Ghi nợ" hoac cac phuong thuc thanh toan noi boi " + " — tinh 1 lan o
+   * OrderService.toListItem(), dung cho file Excel xuat ra (man hinh dung rieng StatusBadge/badge
+   * mau cho cung du lieu hasDebt/paymentMethods, khong doc field nay).
+   */
+  private String paymentLabel;
+
   public Long getId() {
     return id;
   }
@@ -95,5 +110,21 @@ public class OrderListItemResponse {
 
   public void setPaymentMethods(List<String> paymentMethods) {
     this.paymentMethods = paymentMethods;
+  }
+
+  public String getStatusLabel() {
+    return statusLabel;
+  }
+
+  public void setStatusLabel(String statusLabel) {
+    this.statusLabel = statusLabel;
+  }
+
+  public String getPaymentLabel() {
+    return paymentLabel;
+  }
+
+  public void setPaymentLabel(String paymentLabel) {
+    this.paymentLabel = paymentLabel;
   }
 }

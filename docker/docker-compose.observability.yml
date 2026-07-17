@@ -21,11 +21,23 @@ services:
     depends_on:
       - server
     restart: unless-stopped
+    # Gioi han RAM (phat hien qua audit production readiness 2026-07-17) — moi service khac trong
+    # toan bo stack (postgres/redis/server/web/ml-service/ollama) da co gioi han rieng, 2 container
+    # overlay tuy chon nay thi chua, du van co the bi bat len tren cung 1 VPS nho.
+    deploy:
+      resources:
+        limits:
+          memory: 1g
 
   grafana:
     image: grafana/grafana:11.3.1
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      # ":?..." (bat buoc, KHONG phai ":-admin" mac dinh yeu nhu truoc) — phat hien qua audit
+      # production readiness 2026-07-17: neu quen dat GRAFANA_ADMIN_PASSWORD trong .env truoc khi
+      # bat overlay nay, "docker compose up" se BAO LOI RO RANG ngay thay vi am tham khoi dong voi
+      # mat khau "admin" ai cung doan duoc (rui ro da giam nho khong publish port ra host, nhung
+      # van la 1 lop phong thu yeu khong can thiet).
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Chưa đặt GRAFANA_ADMIN_PASSWORD trong .env}
       GF_AUTH_ANONYMOUS_ENABLED: "false"
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
@@ -33,6 +45,10 @@ services:
     depends_on:
       - prometheus
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512m
 
 volumes:
   prometheus-data:

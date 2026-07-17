@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NumberInput } from "@/components/common/NumberInput";
 import {
   Table,
   TableBody,
@@ -42,12 +43,11 @@ function EditPriceDialog({
   item: PurchaseOrderItem;
   onClose: () => void;
 }) {
-  const [unitPrice, setUnitPrice] = useState(String(item.unitPrice));
+  const [newPrice, setNewPrice] = useState(item.unitPrice);
   const [reason, setReason] = useState("");
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const newPrice = Number(unitPrice) || 0;
   const delta = (newPrice - item.unitPrice) * item.quantity;
   const canSave = newPrice > 0 && reason.trim().length > 0;
 
@@ -73,12 +73,11 @@ function EditPriceDialog({
         <div className="space-y-3">
           <div>
             <Label htmlFor="edit-price-value">Giá nhập đúng</Label>
-            <Input
+            <NumberInput
               id="edit-price-value"
-              type="number"
               min={0}
-              value={unitPrice}
-              onChange={(e) => setUnitPrice(e.target.value)}
+              value={newPrice}
+              onValueChange={(v) => setNewPrice(v ?? 0)}
             />
             <p className="mt-1 text-xs text-muted-foreground">
               Giá cũ: {numberFormatter.format(item.unitPrice)}đ (đã nhập {numberFormatter.format(item.quantity)} đơn vị)

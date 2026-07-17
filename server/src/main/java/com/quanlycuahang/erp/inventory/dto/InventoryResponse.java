@@ -18,6 +18,19 @@ public class InventoryResponse {
 
   private LocalDate nearestExpiryDate;
 
+  /**
+   * stock * costPrice — tinh 1 lan o Service, dung chung cho man hinh Ton kho lan xuat Excel (truoc
+   * day FE va Excel export moi noi tu nhan lai rieng, phat hien khi rieng soat).
+   */
+  private BigDecimal stockValue;
+
+  /**
+   * "near_expiry" | "low_stock" | "ok" — tinh 1 lan o InventoryService.computeStatus(), dung chung
+   * cho man hinh Ton kho lan xuat Excel (truoc day moi noi tu tinh lai rieng bang nguong 7 ngay
+   * hardcode doc lap, co the lech nhau neu sua 1 cho quen cho kia — phat hien khi rieng soat).
+   */
+  private String status;
+
   public Long getId() {
     return id;
   }
@@ -88,5 +101,21 @@ public class InventoryResponse {
 
   public void setNearestExpiryDate(LocalDate nearestExpiryDate) {
     this.nearestExpiryDate = nearestExpiryDate;
+  }
+
+  public BigDecimal getStockValue() {
+    return stockValue;
+  }
+
+  public void setStockValue(BigDecimal stockValue) {
+    this.stockValue = stockValue;
+  }
+
+  public String getStatus() {
+    return status;
+  }
+
+  public void setStatus(String status) {
+    this.status = status;
   }
 }

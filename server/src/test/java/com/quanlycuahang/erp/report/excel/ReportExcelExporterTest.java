@@ -4,6 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -51,6 +55,32 @@ class ReportExcelExporterTest {
       assertThat(dataRow2.getCell(0).getStringCellValue()).isEqualTo("Thang 2");
       assertThat(dataRow2.getCell(1).getCellType())
           .isEqualTo(org.apache.poi.ss.usermodel.CellType.BLANK);
+    }
+  }
+
+  private record DateRow(Instant createdAt, LocalDate expiry) {}
+
+  @Test
+  void exportFormatsInstantAndLocalDateAsVietnameseStrings() throws Exception {
+    ReportExcelExporter exporter = new ReportExcelExporter();
+    // 2026-07-16 14:15 gio Viet Nam (UTC+7) — chon gio le de phat hien neu vo tinh dung UTC/gio he
+    // thong thay vi Asia/Ho_Chi_Minh (loi thuc te da gap voi cot "Thời gian" xuat don hang).
+    Instant createdAt =
+        ZonedDateTime.of(2026, 7, 16, 14, 15, 0, 0, ZoneId.of("Asia/Ho_Chi_Minh")).toInstant();
+    LocalDate expiry = LocalDate.of(2026, 7, 20);
+    List<DateRow> rows = List.of(new DateRow(createdAt, expiry));
+
+    byte[] file =
+        exporter.export(
+            "Don hang",
+            List.of("Thời gian", "HSD"),
+            rows,
+            r -> new Object[] {r.createdAt(), r.expiry()});
+
+    try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(file))) {
+      Row dataRow = workbook.getSheet("Don hang").getRow(1);
+      assertThat(dataRow.getCell(0).getStringCellValue()).isEqualTo("16/07/2026 14:15");
+      assertThat(dataRow.getCell(1).getStringCellValue()).isEqualTo("20/07/2026");
     }
   }
 

@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { NumberInput } from "@/components/common/NumberInput";
 import {
   Select,
   SelectContent,
@@ -350,23 +351,21 @@ export function PurchaseOrderCreatePage() {
                           </div>
                           <div>
                             <label className="text-xs text-muted-foreground">SL nhập</label>
-                            <Input
-                              type="number"
+                            <NumberInput
                               min={0}
                               value={line.quantity}
-                              onChange={(e) =>
-                                updateLine(line.product.id, { quantity: Number(e.target.value) })
+                              onValueChange={(v) =>
+                                updateLine(line.product.id, { quantity: v ?? 0 })
                               }
                             />
                           </div>
                           <div>
                             <label className="text-xs text-muted-foreground">Giá nhập</label>
-                            <Input
-                              type="number"
+                            <NumberInput
                               min={0}
                               value={line.unitPrice}
-                              onChange={(e) =>
-                                updateLine(line.product.id, { unitPrice: Number(e.target.value) })
+                              onValueChange={(v) =>
+                                updateLine(line.product.id, { unitPrice: v ?? 0 })
                               }
                             />
                           </div>
@@ -434,12 +433,11 @@ export function PurchaseOrderCreatePage() {
               </div>
               <div className="flex items-center justify-between gap-2">
                 <span className="text-muted-foreground">Chiết khấu NCC</span>
-                <Input
-                  type="number"
+                <NumberInput
                   min={0}
                   className="w-32 text-right"
                   value={discountAmount}
-                  onChange={(e) => setDiscountAmount(Number(e.target.value))}
+                  onValueChange={(v) => setDiscountAmount(v ?? 0)}
                 />
               </div>
               <div className="flex items-center justify-between border-t pt-3 font-semibold">
@@ -448,12 +446,11 @@ export function PurchaseOrderCreatePage() {
               </div>
               <div className="flex items-center justify-between gap-2">
                 <span className="text-muted-foreground">Trả ngay</span>
-                <Input
-                  type="number"
+                <NumberInput
                   min={0}
                   className="w-32 text-right"
                   value={paidAmount}
-                  onChange={(e) => setPaidAmount(Number(e.target.value))}
+                  onValueChange={(v) => setPaidAmount(v ?? 0)}
                 />
               </div>
               {debtAmount > 0 && (

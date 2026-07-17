@@ -2,6 +2,8 @@ import { apiClient } from "@/lib/http/apiClient";
 import { downloadBlob, timestampedFileName } from "@/lib/download";
 import type { ApiSuccess } from "@/types/api";
 
+export type InventoryStatus = "near_expiry" | "low_stock" | "ok";
+
 export interface InventoryItem {
   id: number;
   productId: number;
@@ -12,6 +14,11 @@ export interface InventoryItem {
   minStock: number;
   nearestBatchCode: string | null;
   nearestExpiryDate: string | null;
+  /** stock * costPrice, tinh san o Backend (InventoryService.enrichWithNearestBatch). */
+  stockValue: number;
+  /** Tinh san o Backend (InventoryService.computeStatus) — 1 nguon duy nhat voi file Excel xuat
+   * ra, khong tu tinh lai o day nua (phat hien khi rieng soat, 2 noi tung co the lech nhau). */
+  status: InventoryStatus;
 }
 
 export interface InventoryTransaction {
@@ -73,6 +80,20 @@ export async function getInventoryTransactions(
     { params: { branchId, size: 30 } },
   );
   return response.data.data;
+}
+
+/** Ghi de gia von hien tai (khac voi bien dong binh quan gia quyen tu dong khi nhap hang) - chi
+ * owner/manager, xem InventoryService.overrideCostPrice. */
+export async function updateCostPrice(
+  productId: number,
+  branchId: number,
+  costPrice: number,
+): Promise<void> {
+  await apiClient.patch(
+    `/inventory/products/${productId}/cost-price`,
+    { costPrice },
+    { params: { branchId } },
+  );
 }
 
 export const TRANSACTION_TYPE_LABELS: Record<string, string> = {

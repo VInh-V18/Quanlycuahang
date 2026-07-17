@@ -227,6 +227,76 @@ class ReconciliationServiceIT extends AbstractIntegrationTest {
             "SHIFT_DISCREPANCY_MISMATCH");
   }
 
+  /**
+   * (h) CROSS_TENANT_REFERENCE (them qua audit production readiness 2026-07-17) — test RIENG, KHONG
+   * gop vao detectsAllSevenCheckTypesOnDeliberatelyBrokenData() vi day la vi pham can 2 TENANT khac
+   * nhau (khong the tao qua actingAsUser() 1 tenant duy nhat nhu 7 phep con lai). Ve ly thuyet
+   * KHONG DUONG NAO trong ung dung tao ra duoc tinh huong nay (TenantAwareRepositoryImpl chan lai o
+   * tang repository) — dung repository.save() truc tiep (bo qua Service) de mo phong dung kich ban
+   * "neu lop bao ve tang ung dung bi vo hieu hoa vi ly do nao do".
+   */
+  @Test
+  void detectsCrossTenantReferenceWhenOrderCustomerBelongsToAnotherTenant() {
+    TestDataFactory.TestTenant tenantA =
+        testDataFactory.createTenantWithBranches("tenantReconCrossA");
+    TestDataFactory.TestTenant tenantB =
+        testDataFactory.createTenantWithBranches("tenantReconCrossB");
+    actingAsUser(tenantA.owner());
+
+    // Don hang SACH thuoc tenant A, khach hang cung tenant A -> KHONG duoc bi flag.
+    Order cleanOrder = new Order();
+    cleanOrder.setTenant(tenantA.tenant());
+    cleanOrder.setOrderNumber("IT-RECON-CROSS-CLEAN");
+    cleanOrder.setBranch(tenantA.branchA());
+    cleanOrder.setCashier(tenantA.owner());
+    cleanOrder.setCustomer(
+        testDataFactory.createCustomerWithDebtLimit(tenantA.tenant(), BigDecimal.ZERO));
+    cleanOrder.setStatus(OrderStatus.COMPLETED.getValue());
+    cleanOrder.setSubtotalAmount(BigDecimal.ZERO);
+    cleanOrder.setDiscountAmount(BigDecimal.ZERO);
+    cleanOrder.setVatAmount(BigDecimal.ZERO);
+    cleanOrder.setRoundingAdjustment(BigDecimal.ZERO);
+    cleanOrder.setShippingFee(BigDecimal.ZERO);
+    cleanOrder.setTotalAmount(BigDecimal.ZERO);
+    orderRepository.save(cleanOrder);
+
+    // Don hang VI PHAM: tenant_id = A nhung customer_id tro sang 1 khach hang thuoc tenant B —
+    // insert truc tiep qua repository (bo qua OrderService, khong co duong that nao trong ung
+    // dung tao ra duoc du lieu nay).
+    Order crossTenantOrder = new Order();
+    crossTenantOrder.setTenant(tenantA.tenant());
+    crossTenantOrder.setOrderNumber("IT-RECON-CROSS-DIRTY");
+    crossTenantOrder.setBranch(tenantA.branchA());
+    crossTenantOrder.setCashier(tenantA.owner());
+    crossTenantOrder.setCustomer(
+        testDataFactory.createCustomerWithDebtLimit(tenantB.tenant(), BigDecimal.ZERO));
+    crossTenantOrder.setStatus(OrderStatus.COMPLETED.getValue());
+    crossTenantOrder.setSubtotalAmount(BigDecimal.ZERO);
+    crossTenantOrder.setDiscountAmount(BigDecimal.ZERO);
+    crossTenantOrder.setVatAmount(BigDecimal.ZERO);
+    crossTenantOrder.setRoundingAdjustment(BigDecimal.ZERO);
+    crossTenantOrder.setShippingFee(BigDecimal.ZERO);
+    crossTenantOrder.setTotalAmount(BigDecimal.ZERO);
+    crossTenantOrder = orderRepository.save(crossTenantOrder);
+
+    ReconciliationRunResponse result =
+        reconciliationService.runForTenant(
+            tenantA.tenant().getId(), ReconciliationRun.TRIGGER_MANUAL, null);
+
+    assertThat(result.getStatus()).isEqualTo(ReconciliationRun.STATUS_COMPLETED);
+    Order finalCrossTenantOrder = crossTenantOrder;
+    assertThat(result.getFindings())
+        .filteredOn(f -> "CROSS_TENANT_REFERENCE".equals(f.getCheckType()))
+        .hasSize(1)
+        .first()
+        .satisfies(
+            f -> {
+              assertThat(f.getEntityType()).isEqualTo("order");
+              assertThat(f.getEntityId()).isEqualTo(finalCrossTenantOrder.getId());
+              assertThat(f.getSeverity()).isEqualTo("critical");
+            });
+  }
+
   @Test
   void reportsZeroFindingsWhenDataBuiltThroughRealServicesOnly() {
     TestDataFactory.TestTenant tenant =

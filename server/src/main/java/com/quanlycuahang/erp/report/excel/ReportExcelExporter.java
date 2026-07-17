@@ -4,6 +4,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.function.Function;
 import org.apache.poi.ss.usermodel.Cell;
@@ -12,6 +16,9 @@ import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
 /**
@@ -32,6 +39,10 @@ public class ReportExcelExporter {
 
   private static final int MIN_COLUMN_WIDTH_CHARS = 12;
   private static final int MAX_COLUMN_WIDTH_CHARS = 40;
+  private static final ZoneId APP_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+  private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+  private static final DateTimeFormatter DATE_TIME_FORMATTER =
+      DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(APP_ZONE);
 
   public <T> byte[] export(
       String sheetName, List<String> headers, List<T> rows, Function<T, Object[]> rowMapper) {
@@ -74,11 +85,34 @@ public class ReportExcelExporter {
     }
   }
 
+  /**
+   * Boc byte[] .xlsx thanh ResponseEntity tai ve — truoc day 3 Controller (Inventory/Order/Report)
+   * moi noi tu viet lai y het doan nay rieng, chi ReportController co san 1 ham private trung ten
+   * (phat hien khi rieng soat) — gop ve 1 cho duy nhat de ca 3 dung chung.
+   */
+  public ResponseEntity<byte[]> toXlsxResponse(byte[] content, String fileName) {
+    return ResponseEntity.ok()
+        .contentType(
+            MediaType.parseMediaType(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+        .body(content);
+  }
+
   private void setCellValue(Cell cell, Object value) {
     if (value == null) {
       cell.setBlank();
     } else if (value instanceof BigDecimal bigDecimal) {
       cell.setCellValue(bigDecimal.doubleValue());
+    } else if (value instanceof Instant instant) {
+      // Instant.toString() mac dinh ra gio UTC dang ky thuat (vd "2026-07-16T07:15:30Z") — quy ve
+      // gio Viet Nam, dinh dang nguoi dung binh thuong doc duoc, dung "chung 1 cho" cho MOI cho
+      // xuat
+      // Excel co truong Instant thay vi tung noi tu xu ly rieng (phat hien khi rieng soat don
+      // hang).
+      cell.setCellValue(DATE_TIME_FORMATTER.format(instant));
+    } else if (value instanceof LocalDate localDate) {
+      cell.setCellValue(DATE_FORMATTER.format(localDate));
     } else if (value instanceof Number number) {
       cell.setCellValue(number.doubleValue());
     } else {

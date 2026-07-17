@@ -51,20 +51,15 @@ function referenceCode(type: string | null, id: number | null): string {
   return `${prefix}${String(id).padStart(6, "0")}`;
 }
 
-function daysUntil(isoDate: string): number {
-  const diffMs = new Date(isoDate + "T00:00:00").getTime() - new Date().setHours(0, 0, 0, 0);
-  return Math.round(diffMs / 86_400_000);
-}
-
-function statusOf(row: InventoryItem, expiryThreshold: number) {
-  if (row.nearestExpiryDate && daysUntil(row.nearestExpiryDate) <= expiryThreshold) {
-    return { label: "Cận hạn — xả 30%", className: "bg-destructive/10 text-destructive" };
-  }
-  if (row.stock <= row.minStock) {
-    return { label: "Dưới định mức", className: "bg-warning/10 text-warning" };
-  }
-  return { label: "Đủ hàng", className: "bg-success/10 text-success" };
-}
+// Nhan/mau hien thi cho InventoryItem.status — nguong/thu tu uu tien tinh san o Backend
+// (InventoryService.computeStatus, dung chung voi file Excel xuat ra), o day chi con anh xa sang
+// nhan tieng Viet + class mau rieng cho FE (phat hien khi rieng soat: truoc day FE tu tinh lai
+// nguong 7 ngay doc lap voi Backend, co the lech nhau neu sua 1 cho quen cho kia).
+const STATUS_META: Record<InventoryItem["status"], { label: string; className: string }> = {
+  near_expiry: { label: "Cận hạn — xả 30%", className: "bg-destructive/10 text-destructive" },
+  low_stock: { label: "Dưới định mức", className: "bg-warning/10 text-warning" },
+  ok: { label: "Đủ hàng", className: "bg-success/10 text-success" },
+};
 
 export function InventoryPage() {
   const branchId = useCurrentBranchId();
@@ -193,7 +188,7 @@ export function InventoryPage() {
               </TableHeader>
               <TableBody>
                 {rows.map((row) => {
-                  const status = statusOf(row, 7);
+                  const status = STATUS_META[row.status];
                   return (
                     <TableRow
                       key={row.id}
@@ -219,7 +214,7 @@ export function InventoryPage() {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Money value={row.stock * row.costPrice} />
+                        <Money value={row.stockValue} />
                       </TableCell>
                       <TableCell>
                         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${status.className}`}>

@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { NumberInput } from "@/components/common/NumberInput";
 import {
   Select,
   SelectContent,
@@ -135,14 +135,12 @@ export function ReturnCreatePage() {
                     <TableCell className="text-right">{numberFormatter.format(item.quantity)}</TableCell>
                     <TableCell className="text-right">{numberFormatter.format(item.returnedQuantity)}</TableCell>
                     <TableCell className="text-right">
-                      <Input
-                        type="number"
+                      <NumberInput
                         min={0}
-                        max={remaining}
                         disabled={remaining <= 0}
                         value={quantities[item.id] ?? ""}
-                        onChange={(e) =>
-                          setQuantities((prev) => ({ ...prev, [item.id]: e.target.value }))
+                        onValueChange={(v) =>
+                          setQuantities((prev) => ({ ...prev, [item.id]: v == null ? "" : String(v) }))
                         }
                         placeholder={remaining <= 0 ? "đã trả đủ" : "0"}
                         className="ml-auto w-24 text-right"

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { NumberInput } from "@/components/common/NumberInput";
 import {
   Select,
   SelectContent,
@@ -262,14 +263,14 @@ export function StockTakeDetailPage() {
                       {numberFormatter.format(item.expectedQty)}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Input
-                        type="number"
+                      <NumberInput
                         disabled={!isDraft}
+                        min={0}
                         value={counts[item.id]?.actualQty ?? ""}
-                        onChange={(e) =>
+                        onValueChange={(v) =>
                           setCounts((prev) => ({
                             ...prev,
-                            [item.id]: { ...prev[item.id], actualQty: e.target.value },
+                            [item.id]: { ...prev[item.id], actualQty: v == null ? "" : String(v) },
                           }))
                         }
                         placeholder="Chưa cân"

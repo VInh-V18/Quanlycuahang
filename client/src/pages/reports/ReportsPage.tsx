@@ -364,8 +364,17 @@ export function ReportsPage() {
           </Card>
 
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle>Top khách hàng</CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  downloadReportExcel("top-customers", { ...params, limit: 10 }, "top-khach-hang.xlsx")
+                }
+              >
+                <Download className="h-4 w-4" />
+              </Button>
             </CardHeader>
             <CardContent>
               <DataTable
@@ -449,6 +458,19 @@ export function ReportsPage() {
                   </TabsList>
                 </Tabs>
                 <AiExplainButton dataContext={{ huongNo: debtDirection, congNo: debtQuery.data }} />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    downloadReportExcel(
+                      "debt-aging",
+                      { direction: debtDirection },
+                      debtDirection === "receivable" ? "cong-no-phai-thu.xlsx" : "cong-no-phai-tra.xlsx",
+                    )
+                  }
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
               </div>
             </CardHeader>
             <CardContent>

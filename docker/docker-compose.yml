@@ -96,6 +96,16 @@ services:
       retries: 3
     restart: unless-stopped
     logging: *default-logging
+    # Gioi han RAM — phat hien qua audit production readiness (2026-07-17): moi service khac trong
+    # stack nay (postgres/redis/server/web o docker-compose.prod.yml, ollama ngay duoi day) da co
+    # gioi han rieng, rieng ml-service (Python/scikit-learn) thi khong — 1 loi ro ri bo nho hoac 1
+    # request du bao qua nang co the chiem het RAM con lai cua VPS nho, anh huong ca Postgres/server
+    # dang chay chung. Day la dich vu PHU (co fallback ve thuat toan don gian neu loi/timeout), khong
+    # can nhieu RAM nhu Ollama.
+    deploy:
+      resources:
+        limits:
+          memory: 512m
 
   # Prompt #12 (nang cap) - model AI tu host qua Ollama, thay the API dam may Anthropic khi
   # AI_PROVIDER_TYPE=ollama trong .env (xem OllamaAiProvider) - mien phi, khong gui du lieu ra

@@ -3,6 +3,12 @@ name: CI
 on:
   push:
     branches: [main, master]
+    # Thieu tags: truoc day (phat hien qua audit production readiness 2026-07-17) — GitHub Actions
+    # chi bat su kien push cho ref khop dung loai filter da khai bao; chi co "branches" nghia la 1
+    # git tag push (vd v1.2.0) KHONG BAO GIO chay workflow nay, du job docker-images ben duoi da
+    # viet san logic tag semver (metadata-action type=semver) — duong build/push theo tag thuc te
+    # la dead code neu thieu dong nay.
+    tags: ['v*.*.*']
   pull_request:
 
 jobs:

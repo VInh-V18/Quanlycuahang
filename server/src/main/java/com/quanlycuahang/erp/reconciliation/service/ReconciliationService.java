@@ -24,11 +24,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Doi soat toan ven du lieu (Prompt #6, P1) — 7 phep doi soat (a-g), MOI phep la 1 cau SQL
- * aggregate DUY NHAT loc theo tenant_id thu cong (JdbcTemplate di thang qua DataSource, KHONG qua
- * Hibernate Session/@Filter — giong 12 file native-query o Prompt #4, phai tu them dieu kien
- * tenant_id), KHONG nap tung ban ghi vao Java roi so sanh (yeu cau hieu nang cua roadmap: tenant
- * 20k SKU van phai xong duoi 30 giay — 1 round-trip DB/phep, khong phai N vong lap).
+ * Doi soat toan ven du lieu (Prompt #6, P1; phep (h) them qua audit production readiness
+ * 2026-07-17) — 8 phep doi soat (a-h), MOI phep la 1 cau SQL aggregate DUY NHAT loc theo tenant_id
+ * thu cong (JdbcTemplate di thang qua DataSource, KHONG qua Hibernate Session/@Filter — giong 12
+ * file native-query o Prompt #4, phai tu them dieu kien tenant_id), KHONG nap tung ban ghi vao Java
+ * roi so sanh (yeu cau hieu nang cua roadmap: tenant 20k SKU van phai xong duoi 30 giay — 1
+ * round-trip DB/phep, khong phai N vong lap).
  *
  * <p>2 diem dieu chinh cong thuc so voi mo ta roadmap (da kiem chung lai voi code that, ghi ro o
  * day thay vi lam theo mo ta khong chinh xac):
@@ -106,6 +107,7 @@ public class ReconciliationService {
       findings.addAll(checkReturnOverQuantity(tenantId, run));
       findings.addAll(checkOrphanedReferences(tenantId, run));
       findings.addAll(checkShiftDiscrepancyMismatch(tenantId, run));
+      findings.addAll(checkCrossTenantReferences(tenantId, run));
 
       findingRepository.saveAll(findings);
       run.setFindingsCount(findings.size());
@@ -421,6 +423,76 @@ public class ReconciliationService {
               rs.getLong("id"),
               details);
         },
+        tenantId);
+  }
+
+  /**
+   * (h) Tham chieu CHEO TENANT tren FK THAT (khac voi (f) chi soi cap reference_type/reference_id
+   * da hinh) — vd orders.customer_id tro sang 1 customer thuoc tenant KHAC. Ve ly thuyet KHONG BAO
+   * GIO xay ra nho TenantAwareRepositoryImpl + Hibernate @Filter (da xac nhan bang 8 test tich hop
+   * that trong TenantIsolationIT), nhung day la lop phong thu THU HAI o tang du lieu — phat hien
+   * qua audit production readiness (2026-07-17): du an nay tung co 2 loi ro ri tenant nghiem trong
+   * o qua khu (xem bo nho "Hibernate @Filter gotchas"), nen 1 lop kiem tra doc lap o tang DB, chay
+   * dinh ky, la phong ngua hop ly cho tuong lai neu co lo hong tuong tu tai xuat hien. Nghiem trong
+   * hon ORPHANED_REFERENCE (medium) vi day la RO RI DU LIEU giua 2 khach hang, khong chi du lieu mo
+   * coi — luon gan "critical".
+   */
+  private List<ReconciliationFinding> checkCrossTenantReferences(
+      Long tenantId, ReconciliationRun run) {
+    String sql =
+        "SELECT 'order' AS entity_type, o.id AS entity_id, 'customer_id' AS fk_column, o.customer_id AS fk_value "
+            + "FROM orders o JOIN customers c ON c.id = o.customer_id "
+            + "WHERE o.tenant_id = ? AND o.deleted_at IS NULL AND o.customer_id IS NOT NULL AND c.tenant_id <> o.tenant_id "
+            + "UNION ALL "
+            + "SELECT 'order', o.id, 'branch_id', o.branch_id "
+            + "FROM orders o JOIN branches b ON b.id = o.branch_id "
+            + "WHERE o.tenant_id = ? AND o.deleted_at IS NULL AND b.tenant_id <> o.tenant_id "
+            + "UNION ALL "
+            + "SELECT 'order', o.id, 'voucher_id', o.voucher_id "
+            + "FROM orders o JOIN vouchers v ON v.id = o.voucher_id "
+            + "WHERE o.tenant_id = ? AND o.deleted_at IS NULL AND o.voucher_id IS NOT NULL AND v.tenant_id <> o.tenant_id "
+            + "UNION ALL "
+            + "SELECT 'order_item', oi.id, 'product_id', oi.product_id "
+            + "FROM order_items oi JOIN products p ON p.id = oi.product_id "
+            + "WHERE oi.tenant_id = ? AND oi.deleted_at IS NULL AND p.tenant_id <> oi.tenant_id "
+            + "UNION ALL "
+            + "SELECT 'debt', d.id, 'customer_id', d.customer_id "
+            + "FROM debts d JOIN customers c ON c.id = d.customer_id "
+            + "WHERE d.tenant_id = ? AND d.deleted_at IS NULL AND d.customer_id IS NOT NULL AND c.tenant_id <> d.tenant_id "
+            + "UNION ALL "
+            + "SELECT 'debt', d.id, 'supplier_id', d.supplier_id "
+            + "FROM debts d JOIN suppliers s ON s.id = d.supplier_id "
+            + "WHERE d.tenant_id = ? AND d.deleted_at IS NULL AND d.supplier_id IS NOT NULL AND s.tenant_id <> d.tenant_id "
+            + "UNION ALL "
+            + "SELECT 'purchase_order', po.id, 'supplier_id', po.supplier_id "
+            + "FROM purchase_orders po JOIN suppliers s ON s.id = po.supplier_id "
+            + "WHERE po.tenant_id = ? AND po.deleted_at IS NULL AND s.tenant_id <> po.tenant_id "
+            + "UNION ALL "
+            + "SELECT 'inventory', i.id, 'product_id', i.product_id "
+            + "FROM inventory i JOIN products p ON p.id = i.product_id "
+            + "WHERE i.tenant_id = ? AND i.deleted_at IS NULL AND p.tenant_id <> i.tenant_id";
+    return jdbcTemplate.query(
+        sql,
+        (rs, rowNum) -> {
+          Map<String, Object> details = new LinkedHashMap<>();
+          details.put("fkColumn", rs.getString("fk_column"));
+          details.put("fkValue", rs.getLong("fk_value"));
+          return newFinding(
+              run,
+              tenantId,
+              "CROSS_TENANT_REFERENCE",
+              "critical",
+              rs.getString("entity_type"),
+              rs.getLong("entity_id"),
+              details);
+        },
+        tenantId,
+        tenantId,
+        tenantId,
+        tenantId,
+        tenantId,
+        tenantId,
+        tenantId,
         tenantId);
   }
 

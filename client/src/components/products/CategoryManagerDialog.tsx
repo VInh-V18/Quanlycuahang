@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { NumberInput } from "@/components/common/NumberInput";
 import {
   Dialog,
   DialogContent,
@@ -147,7 +148,7 @@ function CategoryRow({
   const [parentId, setParentId] = useState<string>(
     category?.parentId != null ? String(category.parentId) : NO_PARENT,
   );
-  const [displayOrder, setDisplayOrder] = useState(String(category?.displayOrder ?? 0));
+  const [displayOrder, setDisplayOrder] = useState<number | null>(category?.displayOrder ?? 0);
   const { toast } = useToast();
 
   const saveMutation = useMutation({
@@ -155,7 +156,7 @@ function CategoryRow({
       const request = {
         name,
         parentId: parentId === NO_PARENT ? null : Number(parentId),
-        displayOrder: Number(displayOrder) || 0,
+        displayOrder: displayOrder ?? 0,
       };
       return isNew ? createCategory(request) : updateCategory(category!.id, request);
     },
@@ -246,10 +247,11 @@ function CategoryRow({
         </Select>
       </TableCell>
       <TableCell>
-        <Input
-          type="number"
+        <NumberInput
           value={displayOrder}
-          onChange={(e) => setDisplayOrder(e.target.value)}
+          onValueChange={setDisplayOrder}
+          allowDecimal={false}
+          min={0}
           className="h-8 text-right"
         />
       </TableCell>

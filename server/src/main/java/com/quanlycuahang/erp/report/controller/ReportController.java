@@ -14,8 +14,6 @@ import com.quanlycuahang.erp.report.excel.ReportExcelExporter;
 import com.quanlycuahang.erp.report.service.ReportService;
 import java.time.LocalDate;
 import java.util.List;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -64,10 +62,17 @@ public class ReportController {
     byte[] file =
         excelExporter.export(
             "Doanh thu",
-            List.of("Nhóm", "Doanh thu", "Số đơn"),
+            List.of("Nhóm", "Doanh thu", "Số đơn", "Giá vốn hàng bán", "Lợi nhuận gộp"),
             data,
-            row -> new Object[] {row.getLabel(), row.getRevenue(), row.getOrderCount()});
-    return excelFile(file, "doanh-thu.xlsx");
+            row ->
+                new Object[] {
+                  row.getLabel(),
+                  row.getRevenue(),
+                  row.getOrderCount(),
+                  row.getCostOfGoodsSold(),
+                  row.getGrossProfit()
+                });
+    return excelExporter.toXlsxResponse(file, "doanh-thu.xlsx");
   }
 
   @GetMapping("/gross-profit")
@@ -108,7 +113,7 @@ public class ReportController {
                 new Object[] {
                   row.getSku(), row.getProductName(), row.getQuantitySold(), row.getRevenue()
                 });
-    return excelFile(file, "top-san-pham.xlsx");
+    return excelExporter.toXlsxResponse(file, "top-san-pham.xlsx");
   }
 
   @GetMapping("/top-customers")
@@ -120,6 +125,23 @@ public class ReportController {
       @RequestParam(defaultValue = "10") int limit) {
     return ResponseEntity.ok(
         ApiResponse.success(reportService.topCustomers(filter(from, to, branchId), limit)));
+  }
+
+  @GetMapping("/top-customers/export")
+  @PreAuthorize("hasAuthority('report:revenue') and hasAuthority('report:export')")
+  public ResponseEntity<byte[]> exportTopCustomers(
+      @RequestParam LocalDate from,
+      @RequestParam LocalDate to,
+      @RequestParam(required = false) Long branchId,
+      @RequestParam(defaultValue = "10") int limit) {
+    List<TopCustomerResponse> data = reportService.topCustomers(filter(from, to, branchId), limit);
+    byte[] file =
+        excelExporter.export(
+            "Top khach hang",
+            List.of("Khách hàng", "Số đơn", "Doanh thu"),
+            data,
+            row -> new Object[] {row.getCustomerName(), row.getOrderCount(), row.getRevenue()});
+    return excelExporter.toXlsxResponse(file, "top-khach-hang.xlsx");
   }
 
   @GetMapping("/employee-performance")
@@ -152,7 +174,7 @@ public class ReportController {
                   row.getRevenue(),
                   row.getAverageOrderValue()
                 });
-    return excelFile(file, "hieu-suat-nhan-vien.xlsx");
+    return excelExporter.toXlsxResponse(file, "hieu-suat-nhan-vien.xlsx");
   }
 
   @GetMapping("/inventory-value")
@@ -177,7 +199,7 @@ public class ReportController {
             List.of("Nhóm", "Giá trị tồn kho", "Số lượng"),
             data,
             row -> new Object[] {row.getLabel(), row.getTotalValue(), row.getTotalQuantity()});
-    return excelFile(file, "gia-tri-ton-kho.xlsx");
+    return excelExporter.toXlsxResponse(file, "gia-tri-ton-kho.xlsx");
   }
 
   @GetMapping("/debt-aging")
@@ -185,6 +207,21 @@ public class ReportController {
   public ResponseEntity<ApiResponse<List<DebtAgingBucketResponse>>> debtAging(
       @RequestParam String direction) {
     return ResponseEntity.ok(ApiResponse.success(reportService.debtAging(direction)));
+  }
+
+  @GetMapping("/debt-aging/export")
+  @PreAuthorize("hasAuthority('debt:view') and hasAuthority('report:export')")
+  public ResponseEntity<byte[]> exportDebtAging(@RequestParam String direction) {
+    List<DebtAgingBucketResponse> data = reportService.debtAging(direction);
+    byte[] file =
+        excelExporter.export(
+            "Cong no theo tuoi no",
+            List.of("Tuổi nợ (ngày)", "Số khoản", "Tổng tiền"),
+            data,
+            row -> new Object[] {row.getBucket(), row.getDebtCount(), row.getTotalAmount()});
+    String fileName =
+        "receivable".equals(direction) ? "cong-no-phai-thu.xlsx" : "cong-no-phai-tra.xlsx";
+    return excelExporter.toXlsxResponse(file, fileName);
   }
 
   private List<RevenueBucketResponse> revenueByGroup(ReportFilter filter, String groupBy) {
@@ -215,14 +252,5 @@ public class ReportController {
     filter.setTo(to);
     filter.setBranchId(branchId);
     return filter;
-  }
-
-  private static ResponseEntity<byte[]> excelFile(byte[] content, String fileName) {
-    return ResponseEntity.ok()
-        .contentType(
-            MediaType.parseMediaType(
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
-        .body(content);
   }
 }

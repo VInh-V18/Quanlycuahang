@@ -31,8 +31,6 @@ public interface OrderRepository
   @Query("SELECT o FROM Order o WHERE o.id = :id")
   Optional<Order> findByIdForUpdate(@Param("id") Long id);
 
-  Page<Order> findByBranchIdOrderByCreatedAtDesc(Long branchId, Pageable pageable);
-
   long countByShiftId(Long shiftId);
 
   /**

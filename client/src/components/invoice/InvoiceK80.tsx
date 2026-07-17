@@ -128,11 +128,7 @@ export function InvoiceK80({ invoice }: InvoiceK80Props) {
         <div>Quý khách vui lòng kiểm tra trước khi nhận hàng</div>
         <div>Không đổi, trả khi đã nhận hàng. Xin cảm ơn quý khách!</div>
       </div>
-      <div className="mt-4 grid grid-cols-3 gap-1 text-center text-[10px] font-semibold">
-        <div>KHÁCH HÀNG</div>
-        <div>NGƯỜI GIAO</div>
-        <div>THỦ KHO</div>
-      </div>
+      
     </div>
   );
 }

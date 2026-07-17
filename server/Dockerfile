@@ -25,4 +25,12 @@ EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=5s --start-period=40s --retries=5 \
     CMD wget -qO- http://localhost:8080/actuator/health | grep -q '"status":"UP"' || exit 1
 
+# JDK 21 tu bat container-aware ergonomics (MaxRAMPercentage mac dinh 25%) — voi container 1g
+# rieng (docker-compose.prod.yml), 25% chi ~256MB heap cho ca Hikari pool + Hibernate + Jackson,
+# kha eo hep khi khong co gi khac chia se container nay (phat hien qua audit production readiness
+# 2026-07-17). Nang len 75% de tan dung tot hon ngan sach bo nho da danh rieng cho container. Dat
+# qua JAVA_TOOL_OPTIONS (khong hardcode vao ENTRYPOINT) de van override duoc qua bien moi truong
+# neu can chinh lai o 1 lan trien khai cu the ma khong phai build lai image.
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0"
+
 ENTRYPOINT ["java", "-jar", "app.jar"]

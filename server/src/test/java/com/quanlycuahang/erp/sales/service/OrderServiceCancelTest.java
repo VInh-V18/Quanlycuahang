@@ -137,9 +137,10 @@ class OrderServiceCancelTest {
     OrderItem item = item(2L, BigDecimal.valueOf(3), BigDecimal.ZERO);
     when(orderItemRepository.findByOrderId(1L)).thenReturn(List.of(item));
     Inventory inventory = new Inventory();
+    inventory.setProduct(item.getProduct());
     inventory.setStock(BigDecimal.valueOf(7));
-    when(inventoryRepository.findByProductIdAndBranchId(2L, 10L))
-        .thenReturn(Optional.of(inventory));
+    when(inventoryRepository.findByBranchIdAndProductIdIn(10L, List.of(2L)))
+        .thenReturn(List.of(inventory));
 
     var response = service.cancelOrder(1L);
 
@@ -157,9 +158,10 @@ class OrderServiceCancelTest {
     OrderItem item = item(2L, BigDecimal.valueOf(5), BigDecimal.valueOf(2));
     when(orderItemRepository.findByOrderId(1L)).thenReturn(List.of(item));
     Inventory inventory = new Inventory();
+    inventory.setProduct(item.getProduct());
     inventory.setStock(BigDecimal.ZERO);
-    when(inventoryRepository.findByProductIdAndBranchId(2L, 10L))
-        .thenReturn(Optional.of(inventory));
+    when(inventoryRepository.findByBranchIdAndProductIdIn(10L, List.of(2L)))
+        .thenReturn(List.of(inventory));
 
     service.cancelOrder(1L);
 

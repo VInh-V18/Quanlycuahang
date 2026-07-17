@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NumberInput } from "@/components/common/NumberInput";
 import {
   Select,
   SelectContent,
@@ -102,11 +103,11 @@ function PaymentDialog({
           </div>
           <div>
             <Label htmlFor="payment-amount">Số tiền</Label>
-            <Input
+            <NumberInput
               id="payment-amount"
-              type="number"
+              min={0}
               value={amount}
-              onChange={(e) => setAmount(Number(e.target.value))}
+              onValueChange={(v) => setAmount(v ?? 0)}
             />
           </div>
           <div>

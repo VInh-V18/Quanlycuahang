@@ -367,18 +367,34 @@ public class OrderService {
               + " trước");
     }
 
+    List<OrderItem> orderItems = orderItemRepository.findByOrderId(order.getId());
+    // Nap truoc TOAN BO Inventory lien quan bang 1 truy van (giong dung mau createOrder() dong
+    // ~193-198) thay vi tung dong tu goi findByProductIdAndBranchId rieng — N+1 that su (phat
+    // hien khi rieng soat), don gia tri thuc te khi 1 don co nhieu dong.
+    List<Long> productIds =
+        orderItems.stream().map(i -> i.getProduct().getId()).distinct().toList();
+    Map<Long, Inventory> inventoriesByProductId =
+        inventoryRepository
+            .findByBranchIdAndProductIdIn(order.getBranch().getId(), productIds)
+            .stream()
+            .collect(
+                java.util.stream.Collectors.toMap(inv -> inv.getProduct().getId(), inv -> inv));
+
     List<InventoryTransaction> stockMovements = new ArrayList<>();
     var canceller = currentUserProvider.getCurrentUser();
-    for (OrderItem item : orderItemRepository.findByOrderId(order.getId())) {
+    for (OrderItem item : orderItems) {
       BigDecimal remainingQty = item.getQuantity().subtract(item.getReturnedQuantity());
       if (remainingQty.compareTo(BigDecimal.ZERO) <= 0) {
         continue;
       }
-      Inventory inventory =
-          inventoryRepository
-              .findByProductIdAndBranchId(item.getProduct().getId(), order.getBranch().getId())
-              .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tồn kho"));
+      Inventory inventory = inventoriesByProductId.get(item.getProduct().getId());
+      if (inventory == null) {
+        throw new ResourceNotFoundException("Không tìm thấy tồn kho");
+      }
       inventory.setStock(inventory.getStock().add(remainingQty));
+      // Giu saveAndFlush TUNG dong (khong gop saveAll) - can @Version optimistic lock bat xung
+      // dot NGAY trong vong lap, giong dung tien le da co o createOrder(), khac voi N+1 o cau
+      // truy van doc da sua ben tren.
       inventoryRepository.saveAndFlush(inventory);
 
       InventoryTransaction transaction = new InventoryTransaction();
@@ -407,6 +423,17 @@ public class OrderService {
   private static final ZoneId APP_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
   private static final Map<String, String> PAYMENT_METHOD_LABELS =
       Map.of("cash", "Tiền mặt", "bank_transfer", "Chuyển khoản", "card", "Thẻ");
+
+  // Mirror client/src/lib/orderStatus.ts STATUS_MAP — 1 nguon duy nhat cho nhan tieng Viet cua
+  // trang thai don hang, dung cho OrderListItemResponse.statusLabel (truoc day OrderController tu
+  // dich lai rieng cho file Excel xuat ra, phat hien khi rieng soat co the lech nhau).
+  private static final Map<String, String> ORDER_STATUS_LABELS =
+      Map.of(
+          "completed", "Hoàn thành",
+          "partially_returned", "Trả một phần",
+          "fully_returned", "Đã trả hết",
+          "cancelled", "Đã hủy",
+          "draft", "Nháp");
 
   /** Danh sach don hang co loc (FH-9) — dung cho trang Don hang. */
   @Transactional(readOnly = true)
@@ -455,6 +482,14 @@ public class OrderService {
             : Arrays.stream(rawMethods.split(","))
                 .map(m -> PAYMENT_METHOD_LABELS.getOrDefault(m, m))
                 .toList());
+    response.setStatusLabel(
+        ORDER_STATUS_LABELS.getOrDefault(response.getStatus(), response.getStatus()));
+    response.setPaymentLabel(
+        response.isHasDebt()
+            ? "Ghi nợ"
+            : response.getPaymentMethods().isEmpty()
+                ? ""
+                : String.join(" + ", response.getPaymentMethods()));
     return response;
   }
 
